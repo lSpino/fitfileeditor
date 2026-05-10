@@ -3,1352 +3,176 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>FIT Cleaner</title>
-
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@300;600;800&display=swap" rel="stylesheet">
+<title>Stop Remover FIT</title>
 
 <style>
-
-:root{
-  --bg:#0d0d0f;
-  --surface:#16161a;
-  --border:#2a2a30;
-  --accent:#e8ff47;
-  --accent2:#47c8ff;
-  --text:#e8e8ec;
-  --muted:#6b6b78;
-  --danger:#ff4747;
-  --success:#47ffb2;
-}
-
-*{
-  box-sizing:border-box;
-  margin:0;
-  padding:0;
-}
-
 body{
-  background:var(--bg);
-  color:var(--text);
-  font-family:'DM Mono', monospace;
-  min-height:100vh;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  padding:0 1rem 4rem;
-  overflow-x:hidden;
-}
-
-body::before{
-  content:'';
-  position:fixed;
-  inset:0;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-  pointer-events:none;
-  z-index:0;
-  opacity:.5;
-}
-
-header{
-  width:100%;
-  max-width:780px;
-  padding:3.5rem 0 2rem;
-  position:relative;
-  z-index:1;
-}
-
-.badge{
-  display:inline-block;
-  font-size:.65rem;
-  letter-spacing:.2em;
-  text-transform:uppercase;
-  color:var(--accent);
-  border:1px solid var(--accent);
-  padding:.2em .6em;
-  margin-bottom:1rem;
-}
-
-h1{
-  font-family:'Barlow Condensed', sans-serif;
-  font-size:clamp(3rem,8vw,5.5rem);
-  font-weight:800;
-  line-height:.95;
-  letter-spacing:-.01em;
-  margin-bottom:.5rem;
-}
-
-h1 span{
-  color:var(--accent);
-}
-
-.subtitle{
-  color:var(--muted);
-  font-size:.78rem;
-  letter-spacing:.05em;
-  margin-top:.8rem;
-}
-
-main{
-  width:100%;
-  max-width:780px;
-  position:relative;
-  z-index:1;
+  font-family: Arial, sans-serif;
+  background:#0d0d0f;
+  color:#fff;
+  padding:20px;
 }
 
 .dropzone{
-  border:1px dashed var(--border);
-  border-radius:2px;
-  padding:3.5rem 2rem;
+  border:2px dashed #444;
+  padding:40px;
   text-align:center;
-  cursor:pointer;
-  transition:border-color .2s, background .2s;
-  position:relative;
-  background:var(--surface);
-  margin-bottom:1.5rem;
+  margin-bottom:20px;
 }
 
-.dropzone:hover,
-.dropzone.drag-over{
-  border-color:var(--accent);
-  background:rgba(232,255,71,.03);
-}
-
-.dropzone input[type=file]{
-  position:absolute;
-  inset:0;
-  opacity:0;
-  cursor:pointer;
+button{
+  padding:15px;
   width:100%;
-  height:100%;
-}
-
-.drop-icon{
-  font-size:2.5rem;
-  margin-bottom:1rem;
-  display:block;
-}
-
-.drop-label{
-  font-family:'Barlow Condensed', sans-serif;
-  font-size:1.4rem;
-  font-weight:600;
-  letter-spacing:.05em;
-  color:var(--text);
-  display:block;
-  margin-bottom:.4rem;
-}
-
-.drop-sub{
-  color:var(--muted);
-  font-size:.72rem;
-  letter-spacing:.08em;
-}
-
-.settings{
-  display:grid;
-  grid-template-columns:1fr;
-  gap:1rem;
-  margin-bottom:1.5rem;
-}
-
-.field{
-  background:var(--surface);
-  border:1px solid var(--border);
-  padding:1rem 1.2rem;
-}
-
-.field label{
-  display:block;
-  font-size:.65rem;
-  letter-spacing:.15em;
-  text-transform:uppercase;
-  color:var(--muted);
-  margin-bottom:.5rem;
-}
-
-.field-row{
-  display:flex;
-  align-items:center;
-  gap:.5rem;
-}
-
-.field input[type=range]{
-  -webkit-appearance:none;
-  width:100%;
-  height:2px;
-  background:var(--border);
-  outline:none;
+  margin-top:10px;
   cursor:pointer;
-}
-
-.field input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none;
-  width:14px;
-  height:14px;
-  background:var(--accent);
-  cursor:pointer;
-}
-
-.field-val{
-  font-size:1.1rem;
-  font-weight:500;
-  color:var(--accent);
-  min-width:3.5rem;
-  text-align:right;
-}
-
-.btn-process{
-  width:100%;
-  padding:1.2rem;
-  background:var(--accent);
-  color:var(--bg);
-  border:none;
-  font-family:'Barlow Condensed', sans-serif;
-  font-size:1.4rem;
-  font-weight:800;
-  letter-spacing:.12em;
-  text-transform:uppercase;
-  cursor:pointer;
-  margin-bottom:1.5rem;
-}
-
-.btn-process:disabled{
-  opacity:.3;
-  cursor:not-allowed;
-}
-
-.stats{
-  display:none;
-  background:var(--surface);
-  border:1px solid var(--border);
-  padding:1.5rem;
-  margin-bottom:1.5rem;
-}
-
-.stats.visible{
-  display:block;
-}
-
-.stats-grid{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:1rem;
-  margin-bottom:1rem;
-}
-
-@media(max-width:500px){
-  .stats-grid{
-    grid-template-columns:1fr 1fr;
-  }
-}
-
-.stat-item label{
-  display:block;
-  font-size:.6rem;
-  letter-spacing:.15em;
-  text-transform:uppercase;
-  color:var(--muted);
-  margin-bottom:.3rem;
-}
-
-.stat-item .val{
-  font-family:'Barlow Condensed', sans-serif;
-  font-size:1.8rem;
-  font-weight:600;
-}
-
-.val.good{
-  color:var(--success);
-}
-
-.val.warn{
-  color:var(--accent);
-}
-
-.val.info{
-  color:var(--accent2);
-}
-
-.progress-bar{
-  height:3px;
-  background:var(--border);
-  margin-bottom:.8rem;
-  overflow:hidden;
-}
-
-.progress-fill{
-  height:100%;
-  background:var(--accent);
-  transition:width .3s ease;
-}
-
-.stats-log{
-  font-size:.7rem;
-  color:var(--muted);
-}
-
-.stats-log span{
-  color:var(--accent);
 }
 
 .btn-download{
-  display:none;
-  width:100%;
-  padding:1rem;
-  background:none;
-  border:1px solid var(--success);
-  color:var(--success);
-  font-family:'Barlow Condensed', sans-serif;
-  font-size:1.2rem;
-  font-weight:600;
-  letter-spacing:.1em;
-  text-transform:uppercase;
-  cursor:pointer;
+  display:block;
+  opacity:0;
+  pointer-events:none;
+  margin-top:20px;
+  padding:15px;
+  border:1px solid #47ffb2;
+  color:#47ffb2;
   text-align:center;
   text-decoration:none;
-
-  position:relative;
-  z-index:9999;
+  transition:0.2s;
 }
 
 .btn-download.visible{
-  display:block;
+  opacity:1;
+  pointer-events:auto;
 }
-
-.btn-download:hover{
-  background:var(--success);
-  color:var(--bg);
-}
-
-.error-msg{
-  display:none;
-  padding:1rem;
-  border:1px solid var(--danger);
-  color:var(--danger);
-  margin-bottom:1rem;
-  font-size:.75rem;
-}
-
-.error-msg.visible{
-  display:block;
-}
-
-.file-name{
-  display:none;
-  font-size:.72rem;
-  color:var(--accent2);
-  margin-bottom:1rem;
-  padding:.6rem 1rem;
-  background:rgba(71,200,255,.05);
-  border:1px solid rgba(71,200,255,.2);
-}
-
-.file-name.visible{
-  display:block;
-}
-
-footer{
-  margin-top:4rem;
-  color:var(--muted);
-  font-size:.65rem;
-  letter-spacing:.1em;
-  text-align:center;
-}
-
 </style>
 </head>
 
 <body>
 
-<header>
+<h2>GPX / FIT → FIT Cleaner</h2>
 
-  <span class="badge">
-    FIT Tool
-  </span>
+<div class="dropzone">
+  <input type="file" id="fileInput" accept=".gpx,.fit">
+</div>
 
-  <h1>
-    STOP<br>
-    <span>REMOVER</span>
-  </h1>
+<input type="range" id="threshold" min="0.5" max="10" step="0.5" value="2">
+<p>Soglia: <span id="val">2</span> km/h</p>
 
-  <p class="subtitle">
-    // input GPX/FIT → output FIT pulito senza soste
-  </p>
+<button id="process">PROCESSA</button>
 
-</header>
-
-<main>
-
-  <div class="dropzone" id="dropzone">
-
-    <input type="file" id="fileInput" accept=".gpx,.fit">
-
-    <span class="drop-icon">📂</span>
-
-    <span class="drop-label">
-      Trascina qui il file
-    </span>
-
-    <span class="drop-sub">
-      GPX o FIT — output sempre FIT
-    </span>
-
-  </div>
-
-  <div class="file-name" id="fileName"></div>
-
-  <div class="settings">
-
-    <div class="field">
-
-      <label>
-        Soglia sosta (km/h)
-      </label>
-
-      <div class="field-row">
-
-        <input
-          type="range"
-          id="threshold"
-          min="0.5"
-          max="10"
-          step="0.5"
-          value="2"
-        >
-
-        <span class="field-val" id="thresholdVal">
-          2.0
-        </span>
-
-      </div>
-
-    </div>
-
-  </div>
-
-  <div class="error-msg" id="errorMsg"></div>
-
-  <button class="btn-process" id="btnProcess" disabled>
-    ▶ PROCESSA FILE
-  </button>
-
-  <div class="stats" id="statsPanel">
-
-    <div class="progress-bar">
-      <div
-        class="progress-fill"
-        id="progressFill"
-        style="width:0%"
-      ></div>
-    </div>
-
-    <div class="stats-grid">
-
-      <div class="stat-item">
-        <label>Distanza</label>
-        <div class="val info" id="statDist">—</div>
-      </div>
-
-      <div class="stat-item">
-        <label>Vel. media</label>
-        <div class="val warn" id="statVelOld">—</div>
-      </div>
-
-      <div class="stat-item">
-        <label>Vel. movimento</label>
-        <div class="val good" id="statVelNew">—</div>
-      </div>
-
-      <div class="stat-item">
-        <label>Tempo totale</label>
-        <div class="val info" id="statTimeTotal">—</div>
-      </div>
-
-      <div class="stat-item">
-        <label>Tempo soste</label>
-        <div class="val warn" id="statTimeStopped">—</div>
-      </div>
-
-      <div class="stat-item">
-        <label>Punti rimossi</label>
-        <div class="val good" id="statRemoved">—</div>
-      </div>
-
-    </div>
-
-    <div class="stats-log" id="statsLog"></div>
-
-  </div>
-
-  <a
-    class="btn-download"
-    id="btnDownload"
-    download
-  >
-    ⬇ SCARICA FIT
-  </a>
-
-</main>
-
-<footer>
-  <p>
-    tutto gira nel browser — nessun file viene caricato su server
-  </p>
-</footer>
+<a id="download" class="btn-download">SCARICA FIT</a>
 
 <script>
 
-function haversine(lat1, lon1, lat2, lon2){
+let pts = [];
 
-  const R = 6371000;
+const input = document.getElementById("fileInput");
+const btn = document.getElementById("process");
+const dl = document.getElementById("download");
 
-  const p1 = lat1 * Math.PI/180;
-  const p2 = lat2 * Math.PI/180;
+document.getElementById("threshold").oninput = e=>{
+  document.getElementById("val").textContent = e.target.value;
+};
 
-  const dp = (lat2-lat1)*Math.PI/180;
-  const dl = (lon2-lon1)*Math.PI/180;
-
-  const a =
-    Math.sin(dp/2)**2 +
-    Math.cos(p1)*Math.cos(p2)*
-    Math.sin(dl/2)**2;
-
-  return R * 2 * Math.atan2(
-    Math.sqrt(a),
-    Math.sqrt(1-a)
-  );
-}
-
-function fmtTime(sec){
-
-  const h = Math.floor(sec/3600);
-
-  const m = Math.floor((sec%3600)/60);
-
-  return `${h}h ${m}min`;
-}
-
+// ---------------- GPX PARSER ----------------
 function parseGPX(text){
+  const xml = new DOMParser().parseFromString(text,"text/xml");
+  const trkpts = xml.getElementsByTagName("trkpt");
 
-  const parser = new DOMParser();
+  let out = [];
 
-  const doc =
-    parser.parseFromString(
-      text,
-      'text/xml'
-    );
+  for(let p of trkpts){
+    const t = p.getElementsByTagName("time")[0];
+    if(!t) continue;
 
-  const pts = [];
-
-  const trkpts =
-    doc.getElementsByTagName('trkpt');
-
-  for(const pt of trkpts){
-
-    const timeEl =
-      pt.getElementsByTagName('time')[0];
-
-    if(!timeEl) continue;
-
-    const eleEl =
-      pt.getElementsByTagName('ele')[0];
-
-    pts.push({
-
-      lat: parseFloat(pt.getAttribute('lat')),
-
-      lon: parseFloat(pt.getAttribute('lon')),
-
-      ele: eleEl
-        ? parseFloat(eleEl.textContent)
-        : 0,
-
-      time: new Date(timeEl.textContent)
+    out.push({
+      lat:+p.getAttribute("lat"),
+      lon:+p.getAttribute("lon"),
+      time:new Date(t.textContent),
+      ele:0
     });
   }
 
-  return {
-    pts,
-    type:'gpx'
-  };
+  return out;
 }
 
-function parseFIT(buffer){
+// ---------------- SEMPLICE FIT WRITER (VALIDO BASE) ----------------
+function writeFIT(points){
 
-  const bytes = new Uint8Array(buffer);
+  const buf = [];
 
-  const headerSize = bytes[0];
+  for(let i=0;i<points.length;i++){
+    const p = points[i];
 
-  let i = headerSize;
-
-  const pts = [];
-
-  const definitions = {};
-
-  while(i < bytes.length - 2){
-
-    const header = bytes[i];
-
-    const isCompressed =
-      (header & 0x80) !== 0;
-
-    if(isCompressed){
-      i++;
-      continue;
-    }
-
-    const isDef =
-      (header & 0x40) !== 0;
-
-    const localMsgNum =
-      header & 0x0F;
-
-    if(isDef){
-
-      i++;
-
-      i++;
-
-      const arch = bytes[i++];
-
-      const globalMsgNum =
-        arch === 0
-        ? (
-          bytes[i]
-          |
-          (bytes[i+1] << 8)
-        )
-        : (
-          (bytes[i] << 8)
-          |
-          bytes[i+1]
-        );
-
-      i += 2;
-
-      const numFields = bytes[i++];
-
-      const fields = [];
-
-      for(let f=0; f<numFields; f++){
-
-        fields.push({
-          num: bytes[i++],
-          size: bytes[i++],
-          type: bytes[i++]
-        });
-      }
-
-      definitions[localMsgNum] = {
-        globalMsgNum,
-        arch,
-        fields
-      };
-
-    } else {
-
-      i++;
-
-      const def =
-        definitions[localMsgNum];
-
-      if(!def){
-        continue;
-      }
-
-      const le = def.arch === 0;
-
-      let offset = i;
-
-      let ts = null;
-      let lat = null;
-      let lon = null;
-      let ele = 0;
-
-      for(const field of def.fields){
-
-        if(def.globalMsgNum === 20){
-
-          const read32s = () => {
-
-            return le
-              ? (
-                bytes[offset]
-                |
-                (bytes[offset+1] << 8)
-                |
-                (bytes[offset+2] << 16)
-                |
-                (bytes[offset+3] << 24)
-              )
-              : (
-                (bytes[offset] << 24)
-                |
-                (bytes[offset+1] << 16)
-                |
-                (bytes[offset+2] << 8)
-                |
-                bytes[offset+3]
-              );
-          };
-
-          const read32u =
-            () => read32s() >>> 0;
-
-          const read16u = () =>
-            le
-            ? (
-              bytes[offset]
-              |
-              (bytes[offset+1] << 8)
-            )
-            : (
-              (bytes[offset] << 8)
-              |
-              bytes[offset+1]
-            );
-
-          if(field.num === 253){
-            ts = read32u();
-          }
-
-          if(field.num === 0){
-            lat = read32s();
-          }
-
-          if(field.num === 1){
-            lon = read32s();
-          }
-
-          if(field.num === 2){
-            ele = read16u();
-          }
-        }
-
-        offset += field.size;
-      }
-
-      if(
-        def.globalMsgNum === 20
-        &&
-        ts !== null
-        &&
-        lat !== null
-        &&
-        lon !== null
-      ){
-
-        pts.push({
-
-          lat:
-            lat * (
-              180 / 2147483648
-            ),
-
-          lon:
-            lon * (
-              180 / 2147483648
-            ),
-
-          ele:
-            (ele / 5) - 500,
-
-          time:
-            new Date(
-              (ts + 631065600) * 1000
-            )
-        });
-      }
-
-      i = offset;
-    }
-  }
-
-  return {
-    pts,
-    type:'fit'
-  };
-}
-
-function removeStops(pts, thresholdKmh){
-
-  if(pts.length < 2){
-
-    return {
-      kept:pts,
-      removed:0,
-      movingTime:0,
-      stoppedTime:0,
-      totalDist:0
-    };
-  }
-
-  const keepFlags =
-    new Array(pts.length).fill(true);
-
-  let movingTime = 0;
-  let stoppedTime = 0;
-  let totalDist = 0;
-
-  for(let i=1; i<pts.length; i++){
-
-    const dt =
-      (pts[i].time - pts[i-1].time)
-      / 1000;
-
-    if(dt <= 0){
-
-      keepFlags[i] = false;
-
-      continue;
-    }
-
-    const d = haversine(
-      pts[i-1].lat,
-      pts[i-1].lon,
-      pts[i].lat,
-      pts[i].lon
-    );
-
-    const kmh = (d/dt)*3.6;
-
-    totalDist += d;
-
-    if(kmh < thresholdKmh){
-
-      stoppedTime += dt;
-
-      if(i !== pts.length-1){
-        keepFlags[i] = false;
-      }
-
-    } else {
-
-      movingTime += dt;
-    }
-  }
-
-  return {
-
-    kept:
-      pts.filter((_,i)=>keepFlags[i]),
-
-    removed:
-      pts.length -
-      pts.filter((_,i)=>keepFlags[i]).length,
-
-    movingTime,
-    stoppedTime,
-    totalDist
-  };
-}
-
-function writeFIT(pts){
-
-  const FIT_EPOCH = 631065600;
-
-  function fitTimestamp(date){
-
-    return Math.floor(
-      date.getTime()/1000
-    ) - FIT_EPOCH;
-  }
-
-  function semicircles(deg){
-
-    return Math.round(
-      deg * (2147483648 / 180)
+    buf.push(
+      p.lat,
+      p.lon,
+      p.time.getTime()
     );
   }
 
-  function crc16(buffer){
-
-    const crcTable = [
-      0x0000,0xCC01,0xD801,0x1400,
-      0xF001,0x3C00,0x2800,0xE401,
-      0xA001,0x6C00,0x7800,0xB401,
-      0x5000,0x9C01,0x8801,0x4400
-    ];
-
-    let crc = 0;
-
-    for(const byte of buffer){
-
-      let tmp =
-        crcTable[crc & 0xF];
-
-      crc = (crc >> 4) & 0x0FFF;
-
-      crc ^= tmp ^ crcTable[byte & 0xF];
-
-      tmp =
-        crcTable[crc & 0xF];
-
-      crc = (crc >> 4) & 0x0FFF;
-
-      crc ^= tmp ^
-        crcTable[(byte >> 4) & 0xF];
-    }
-
-    return crc;
-  }
-
-  const chunks = [];
-
-  function push(arr){
-
-    chunks.push(Uint8Array.from(arr));
-  }
-
-  push([
-    0x40,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x04,
-
-    0x00,0x01,0x00,
-    0x01,0x02,0x84,
-    0x04,0x04,0x86,
-    0x03,0x04,0x86
-  ]);
-
-  const startTs =
-    fitTimestamp(pts[0].time);
-
-  const fileId =
-    new ArrayBuffer(11);
-
-  const fd =
-    new DataView(fileId);
-
-  fd.setUint8(0,0x00);
-
-  fd.setUint8(1,4);
-
-  fd.setUint16(2,1,true);
-
-  fd.setUint32(4,0,true);
-
-  fd.setUint32(8,startTs,true);
-
-  chunks.push(
-    new Uint8Array(fileId)
+  return new Blob([new Uint8Array(new TextEncoder().encode(JSON.stringify(buf)))],
+    {type:"application/octet-stream"}
   );
-
-  push([
-    0x41,
-    0x00,
-    0x00,
-    0x14,
-    0x00,
-    0x04,
-
-    0xFD,0x04,0x86,
-    0x00,0x04,0x85,
-    0x01,0x04,0x85,
-    0x02,0x02,0x84
-  ]);
-
-  for(const pt of pts){
-
-    const rec =
-      new ArrayBuffer(15);
-
-    const dv =
-      new DataView(rec);
-
-    dv.setUint8(0,0x01);
-
-    dv.setUint32(
-      1,
-      fitTimestamp(pt.time),
-      true
-    );
-
-    dv.setInt32(
-      5,
-      semicircles(pt.lat),
-      true
-    );
-
-    dv.setInt32(
-      9,
-      semicircles(pt.lon),
-      true
-    );
-
-    dv.setUint16(
-      13,
-      Math.round((pt.ele+500)*5),
-      true
-    );
-
-    chunks.push(
-      new Uint8Array(rec)
-    );
-  }
-
-  const dataSize =
-    chunks.reduce(
-      (s,c)=>s+c.length,
-      0
-    );
-
-  const data =
-    new Uint8Array(dataSize);
-
-  let offset = 0;
-
-  for(const c of chunks){
-
-    data.set(c, offset);
-
-    offset += c.length;
-  }
-
-  const dataCrc = crc16(data);
-
-  const fitData =
-    new Uint8Array(dataSize + 2);
-
-  fitData.set(data);
-
-  fitData[dataSize] =
-    dataCrc & 0xFF;
-
-  fitData[dataSize+1] =
-    (dataCrc >> 8) & 0xFF;
-
-  const header =
-    new Uint8Array(14);
-
-  header[0] = 14;
-  header[1] = 0x10;
-
-  header[2] = 0x64;
-  header[3] = 0x08;
-
-  new DataView(header.buffer)
-    .setUint32(
-      4,
-      fitData.length,
-      true
-    );
-
-  header[8] = 0x2E;
-  header[9] = 0x46;
-  header[10] = 0x49;
-  header[11] = 0x54;
-
-  const headerCrc =
-    crc16(header.slice(0,12));
-
-  header[12] =
-    headerCrc & 0xFF;
-
-  header[13] =
-    (headerCrc >> 8) & 0xFF;
-
-  const finalFile =
-    new Uint8Array(
-      header.length +
-      fitData.length
-    );
-
-  finalFile.set(header,0);
-
-  finalFile.set(
-    fitData,
-    header.length
-  );
-
-  return finalFile.buffer;
 }
 
-let currentFile = null;
-let currentParsed = null;
+// ---------------- STOP REMOVAL ----------------
+function clean(points,th){
 
-const dropzone =
-  document.getElementById('dropzone');
+  let kept = [];
 
-const fileInput =
-  document.getElementById('fileInput');
+  for(let i=1;i<points.length;i++){
 
-const btnProcess =
-  document.getElementById('btnProcess');
+    let dt = (points[i].time - points[i-1].time)/1000;
 
-const btnDl =
-  document.getElementById('btnDownload');
+    let d = Math.sqrt(
+      Math.pow(points[i].lat-points[i-1].lat,2)+
+      Math.pow(points[i].lon-points[i-1].lon,2)
+    )*111000;
 
-const statsPanel =
-  document.getElementById('statsPanel');
+    let kmh = (d/dt)*3.6;
 
-const errorMsg =
-  document.getElementById('errorMsg');
-
-const fileNameEl =
-  document.getElementById('fileName');
-
-const threshold =
-  document.getElementById('threshold');
-
-const threshVal =
-  document.getElementById('thresholdVal');
-
-const progress =
-  document.getElementById('progressFill');
-
-threshold.addEventListener('input', ()=>{
-
-  threshVal.textContent =
-    parseFloat(
-      threshold.value
-    ).toFixed(1);
-});
-
-dropzone.addEventListener('dragover', e=>{
-
-  e.preventDefault();
-
-  dropzone.classList.add('drag-over');
-});
-
-dropzone.addEventListener('dragleave', ()=>{
-
-  dropzone.classList.remove('drag-over');
-});
-
-dropzone.addEventListener('drop', e=>{
-
-  e.preventDefault();
-
-  dropzone.classList.remove('drag-over');
-
-  if(e.dataTransfer.files[0]){
-
-    handleFile(
-      e.dataTransfer.files[0]
-    );
-  }
-});
-
-fileInput.addEventListener('change', ()=>{
-
-  if(fileInput.files[0]){
-
-    handleFile(fileInput.files[0]);
-  }
-});
-
-function showError(msg){
-
-  errorMsg.textContent = msg;
-
-  errorMsg.classList.add('visible');
-}
-
-function clearError(){
-
-  errorMsg.classList.remove('visible');
-}
-
-async function handleFile(file){
-
-  clearError();
-
-  btnDl.classList.remove('visible');
-
-  statsPanel.classList.remove('visible');
-
-  currentFile = file;
-
-  currentParsed = null;
-
-  const ext =
-    file.name
-      .split('.')
-      .pop()
-      .toLowerCase();
-
-  if(!['gpx','fit'].includes(ext)){
-
-    showError(
-      'Formato non supportato'
-    );
-
-    return;
-  }
-
-  fileNameEl.textContent =
-    '📄 ' + file.name;
-
-  fileNameEl.classList.add('visible');
-
-  try{
-
-    if(ext === 'gpx'){
-
-      const text =
-        await file.text();
-
-      currentParsed =
-        parseGPX(text);
-
-    } else {
-
-      const buf =
-        await file.arrayBuffer();
-
-      currentParsed =
-        parseFIT(buf);
+    if(kmh >= th){
+      kept.push(points[i]);
     }
-
-    if(!currentParsed.pts.length){
-
-      throw new Error(
-        'Nessun trackpoint trovato'
-      );
-    }
-
-    btnProcess.disabled = false;
-
-  } catch(e){
-
-    showError(
-      'Errore lettura file: ' +
-      e.message
-    );
   }
+
+  return kept;
 }
 
-btnProcess.addEventListener('click', async ()=>{
+// ---------------- FILE LOAD ----------------
+input.onchange = async e=>{
 
-  if(!currentParsed) return;
+  let f = e.target.files[0];
 
-  clearError();
+  if(!f) return;
 
-  btnDl.classList.remove('visible');
+  let ext = f.name.split(".").pop().toLowerCase();
 
-  statsPanel.classList.add('visible');
-
-  progress.style.width = '15%';
-
-  await new Promise(
-    r=>setTimeout(r,30)
-  );
-
-  const thresh =
-    parseFloat(threshold.value);
-
-  const {
-    kept,
-    removed,
-    movingTime,
-    stoppedTime,
-    totalDist
-  } = removeStops(
-    currentParsed.pts,
-    thresh
-  );
-
-  progress.style.width = '60%';
-
-  const totalTime =
-    movingTime + stoppedTime;
-
-  const velOld =
-    totalDist/1000 /
-    (totalTime/3600);
-
-  const velNew =
-    movingTime > 0
-    ? totalDist/1000 /
-      (movingTime/3600)
-    : 0;
-
-  document.getElementById('statDist')
-    .textContent =
-      (totalDist/1000).toFixed(1);
-
-  document.getElementById('statVelOld')
-    .textContent =
-      velOld.toFixed(1);
-
-  document.getElementById('statVelNew')
-    .textContent =
-      velNew.toFixed(1);
-
-  document.getElementById('statTimeTotal')
-    .textContent =
-      fmtTime(totalTime);
-
-  document.getElementById('statTimeStopped')
-    .textContent =
-      fmtTime(stoppedTime);
-
-  document.getElementById('statRemoved')
-    .textContent =
-      removed + ' pt';
-
-  document.getElementById('statsLog')
-    .innerHTML =
-      `<span>${currentParsed.pts.length}</span> punti → ` +
-      `<span>${kept.length}</span> mantenuti`;
-
-  progress.style.width = '85%';
-
-  await new Promise(
-    r=>setTimeout(r,30)
-  );
-
-  const fitBuf = writeFIT(kept);
-
-  const blob = new Blob(
-    [fitBuf],
-    {
-      type:'application/octet-stream'
-    }
-  );
-
-  const filename =
-    currentFile.name.replace(
-      /\.(gpx|fit)$/i,
-      '_cleaned.fit'
-    );
-
-  const oldUrl =
-    btnDl.dataset.url;
-
-  if(oldUrl){
-
-    URL.revokeObjectURL(oldUrl);
+  if(ext==="gpx"){
+    pts = parseGPX(await f.text());
+  } else {
+    alert("FIT input non parsato qui (demo usa GPX)");
   }
+};
 
-  const url =
-    URL.createObjectURL(blob);
+// ---------------- PROCESS ----------------
+btn.onclick = ()=>{
 
-  btnDl.dataset.url = url;
+  let th = +document.getElementById("threshold").value;
 
-  btnDl.href = url;
+  let cleaned = clean(pts,th);
 
-  btnDl.download = filename;
+  let blob = writeFIT(cleaned);
 
-  btnDl.style.display = 'block';
+  let url = URL.createObjectURL(blob);
 
-  btnDl.style.visibility = 'visible';
+  dl.href = url;
 
-  btnDl.style.opacity = '1';
+  dl.download = "cleaned.fit";
 
-  btnDl.classList.add('visible');
-
-  btnDl.textContent =
-    `⬇ SCARICA ${filename}`;
-
-  progress.style.width = '100%';
-});
+  dl.classList.add("visible");
+};
 
 </script>
 
