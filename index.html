@@ -7,84 +7,81 @@
 <title>FIT Pause & Merge Tool</title>
 
 <style>
-    body{
-        font-family:Arial, Helvetica, sans-serif;
-        background:#f5f5f5;
-        margin:0;
-        padding:40px;
-    }
 
-    .container{
-        max-width:1000px;
-        margin:auto;
-        background:white;
-        padding:30px;
-        border-radius:12px;
-        box-shadow:0 2px 10px rgba(0,0,0,.1);
-    }
+body{
+    font-family:Arial, Helvetica, sans-serif;
+    background:#f5f5f5;
+    margin:0;
+    padding:40px;
+}
 
-    h1{
-        margin-top:0;
-    }
+.container{
+    max-width:900px;
+    margin:auto;
+    background:white;
+    padding:30px;
+    border-radius:12px;
+    box-shadow:0 2px 10px rgba(0,0,0,.1);
+}
 
-    .dropzone{
-        border:3px dashed #999;
-        border-radius:10px;
-        padding:50px;
-        text-align:center;
-        font-size:18px;
-        background:#fafafa;
-        transition:.2s;
-    }
+h1{
+    margin-top:0;
+}
 
-    .dropzone.drag{
-        background:#e8f3ff;
-        border-color:#0077ff;
-    }
+button{
+    padding:14px 22px;
+    border:none;
+    background:#0077ff;
+    color:white;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:16px;
+}
 
-    button{
-        margin-top:20px;
-        padding:14px 24px;
-        border:none;
-        background:#0077ff;
-        color:white;
-        border-radius:8px;
-        font-size:16px;
-        cursor:pointer;
-    }
+button:hover{
+    opacity:.9;
+}
 
-    button:hover{
-        opacity:.9;
-    }
+.settings{
+    display:flex;
+    gap:20px;
+    margin-top:20px;
+    flex-wrap:wrap;
+}
 
-    .settings{
-        margin-top:20px;
-        display:flex;
-        gap:20px;
-        flex-wrap:wrap;
-    }
+.settings label{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
 
-    .settings label{
-        display:flex;
-        flex-direction:column;
-        gap:5px;
-    }
+input[type=number]{
+    padding:8px;
+    width:120px;
+}
 
-    input{
-        padding:8px;
-        width:120px;
-    }
+.log{
+    margin-top:25px;
+    background:#111;
+    color:#0f0;
+    padding:15px;
+    border-radius:10px;
+    font-family:monospace;
+    max-height:350px;
+    overflow:auto;
+}
 
-    .log{
-        margin-top:25px;
-        background:#111;
-        color:#0f0;
-        padding:15px;
-        border-radius:10px;
-        font-family:monospace;
-        max-height:300px;
-        overflow:auto;
-    }
+.filelist{
+    margin-top:20px;
+    padding:10px;
+    background:#f0f0f0;
+    border-radius:8px;
+}
+
+.hidden{
+    display:none;
+}
+
 </style>
 </head>
 
@@ -95,29 +92,50 @@
     <h1>FIT Pause & Merge Tool</h1>
 
     <p>
-        - 1 file FIT → aggiunge pause automatiche<br>
-        - più file FIT → unisce cronologicamente + pause
+        - 1 FIT → aggiunge pause automatiche<br>
+        - più FIT → merge cronologico + pause
     </p>
 
-    <div class="dropzone" id="dropzone">
-        Trascina qui i file .fit
+    <input
+        type="file"
+        id="fileInput"
+        accept=".fit"
+        multiple
+        class="hidden"
+    >
+
+    <button id="selectBtn">
+        Seleziona file FIT
+    </button>
+
+    <div class="filelist" id="filelist">
+        Nessun file selezionato
     </div>
 
     <div class="settings">
 
         <label>
-            Velocità minima (km/h)
-            <input type="number" id="minSpeed" value="1" step="0.1">
+            Velocità minima pausa (km/h)
+            <input
+                type="number"
+                id="minSpeed"
+                value="1"
+                step="0.1"
+            >
         </label>
 
         <label>
-            Durata pausa minima (sec)
-            <input type="number" id="minPause" value="15">
+            Durata minima pausa (sec)
+            <input
+                type="number"
+                id="minPause"
+                value="15"
+            >
         </label>
 
     </div>
 
-    <button id="processBtn">
+    <button id="processBtn" style="margin-top:20px;">
         Processa FIT
     </button>
 
@@ -129,70 +147,72 @@
 
 import FitParser from 'https://cdn.skypack.dev/fit-file-parser';
 
-/*
-========================================
-CONFIG
-========================================
-*/
-
 const FIT_EPOCH = 631065600;
-
-/*
-========================================
-STATE
-========================================
-*/
 
 let loadedFiles = [];
 
+const fileInput =
+    document.getElementById('fileInput');
+
+const filelist =
+    document.getElementById('filelist');
+
+const logEl =
+    document.getElementById('log');
+
 /*
 ========================================
-UI
+LOG
 ========================================
 */
 
-const dropzone = document.getElementById('dropzone');
-const logEl = document.getElementById('log');
-
 function log(msg){
+
     console.log(msg);
+
     logEl.innerHTML += msg + "<br>";
+
     logEl.scrollTop = logEl.scrollHeight;
 }
 
 /*
 ========================================
-DRAG & DROP
+FILE PICKER
 ========================================
 */
 
-dropzone.addEventListener('dragover', e=>{
-    e.preventDefault();
-    dropzone.classList.add('drag');
+document
+.getElementById('selectBtn')
+.addEventListener('click', ()=>{
+
+    fileInput.click();
 });
 
-dropzone.addEventListener('dragleave', ()=>{
-    dropzone.classList.remove('drag');
-});
+fileInput.addEventListener('change', ()=>{
 
-dropzone.addEventListener('drop', e=>{
+    loadedFiles = [...fileInput.files];
 
-    e.preventDefault();
-    dropzone.classList.remove('drag');
+    if(!loadedFiles.length){
 
-    loadedFiles = [...e.dataTransfer.files]
-        .filter(f => f.name.toLowerCase().endsWith('.fit'));
+        filelist.innerHTML =
+            'Nessun file selezionato';
 
-    log("File caricati: " + loadedFiles.length);
+        return;
+    }
 
-    loadedFiles.forEach(f=>{
-        log(" - " + f.name);
+    filelist.innerHTML = '';
+
+    loadedFiles.forEach(file=>{
+
+        filelist.innerHTML +=
+            '• ' + file.name + '<br>';
     });
+
 });
 
 /*
 ========================================
-FIT PARSER
+PARSE FIT
 ========================================
 */
 
@@ -214,14 +234,43 @@ async function parseFit(file){
         parser.parse(buffer, (error, data)=>{
 
             if(error){
+
                 reject(error);
+
             }else{
+
                 resolve(data);
             }
-
         });
 
     });
+}
+
+/*
+========================================
+MERGE RECORDS
+========================================
+*/
+
+function mergeActivities(activities){
+
+    let records = [];
+
+    activities.forEach(a=>{
+
+        if(a.records){
+
+            records.push(...a.records);
+        }
+    });
+
+    records.sort((a,b)=>
+        new Date(a.timestamp)
+        -
+        new Date(b.timestamp)
+    );
+
+    return records;
 }
 
 /*
@@ -230,11 +279,16 @@ DETECT PAUSES
 ========================================
 */
 
-function detectPauses(records, minSpeedKmh, minPauseSeconds){
+function detectPauses(
+    records,
+    minSpeedKmh,
+    minPauseSeconds
+){
 
     const events = [];
 
-    const minSpeed = minSpeedKmh / 3.6;
+    const minSpeed =
+        minSpeedKmh / 3.6;
 
     let paused = false;
     let stopCandidate = null;
@@ -252,24 +306,31 @@ function detectPauses(records, minSpeedKmh, minPauseSeconds){
         if(speed < minSpeed){
 
             if(!stopCandidate){
+
                 stopCandidate = ts;
             }
 
             const duration =
                 (ts - stopCandidate) / 1000;
 
-            if(duration >= minPauseSeconds && !paused){
+            if(
+                duration >= minPauseSeconds
+                &&
+                !paused
+            ){
 
                 paused = true;
 
                 events.push({
-                    timestamp: new Date(stopCandidate),
-                    type: 'stop'
+                    timestamp:
+                        new Date(stopCandidate),
+                    type:'stop'
                 });
 
                 log(
-                    "STOP  " +
-                    stopCandidate.toLocaleTimeString()
+                    'STOP  ' +
+                    stopCandidate
+                    .toLocaleTimeString()
                 );
             }
 
@@ -283,11 +344,11 @@ function detectPauses(records, minSpeedKmh, minPauseSeconds){
 
                 events.push({
                     timestamp: ts,
-                    type: 'start'
+                    type:'start'
                 });
 
                 log(
-                    "START " +
+                    'START ' +
                     ts.toLocaleTimeString()
                 );
             }
@@ -299,57 +360,9 @@ function detectPauses(records, minSpeedKmh, minPauseSeconds){
 
 /*
 ========================================
-MERGE RECORDS
+CRC
 ========================================
 */
-
-function mergeActivities(activities){
-
-    let records = [];
-
-    activities.forEach(a=>{
-
-        if(a.records){
-            records.push(...a.records);
-        }
-
-    });
-
-    records.sort((a,b)=>
-        new Date(a.timestamp) -
-        new Date(b.timestamp)
-    );
-
-    return records;
-}
-
-/*
-========================================
-FIT WRITER
-========================================
-
-ATTENZIONE:
-questa è una versione FIT minimale.
-
-Strava normalmente la importa bene,
-ma non è un encoder Garmin completo.
-
-========================================
-*/
-
-function fitTimestamp(date){
-
-    return Math.floor(
-        date.getTime()/1000 - FIT_EPOCH
-    );
-}
-
-function writeString(view, offset, str){
-
-    for(let i=0;i<str.length;i++){
-        view.setUint8(offset+i, str.charCodeAt(i));
-    }
-}
 
 function crc16(data){
 
@@ -362,8 +375,14 @@ function crc16(data){
         for(let j=0;j<8;j++){
 
             if(crc & 1){
-                crc = (crc >> 1) ^ 0xA001;
+
+                crc =
+                    (crc >> 1)
+                    ^
+                    0xA001;
+
             }else{
+
                 crc >>= 1;
             }
         }
@@ -372,23 +391,41 @@ function crc16(data){
     return crc;
 }
 
+/*
+========================================
+FIT TIMESTAMP
+========================================
+*/
+
+function fitTimestamp(date){
+
+    return Math.floor(
+        date.getTime()/1000
+        -
+        FIT_EPOCH
+    );
+}
+
+/*
+========================================
+CREATE FIT
+========================================
+*/
+
 function createFit(records, pauseEvents){
 
-    /*
-    VERSIONE FIT MINIMALE
-    */
+    const bytes = [];
 
-    const chunks = [];
+    function push(arr){
 
-    function pushBytes(arr){
-        chunks.push(...arr);
+        bytes.push(...arr);
     }
 
     /*
-    HEADER FIT
+    HEADER
     */
 
-    pushBytes([
+    push([
         14,
         0x10,
         100,
@@ -405,22 +442,18 @@ function createFit(records, pauseEvents){
 
         if(!r.timestamp) return;
 
-        const ts = fitTimestamp(
-            new Date(r.timestamp)
-        );
+        const ts =
+            fitTimestamp(
+                new Date(r.timestamp)
+            );
 
-        const lat = r.position_lat || 0;
-        const lon = r.position_long || 0;
-        const alt = r.altitude || 0;
-
-        pushBytes([
+        push([
             0x00,
             ts & 255,
             (ts>>8)&255,
             (ts>>16)&255,
             (ts>>24)&255
         ]);
-
     });
 
     /*
@@ -429,39 +462,43 @@ function createFit(records, pauseEvents){
 
     pauseEvents.forEach(ev=>{
 
-        const ts = fitTimestamp(ev.timestamp);
+        const ts =
+            fitTimestamp(ev.timestamp);
 
-        pushBytes([
+        push([
             0x01,
             ts & 255,
             (ts>>8)&255,
             (ts>>16)&255,
             (ts>>24)&255,
-            ev.type === 'stop' ? 0 : 1
+            ev.type === 'stop'
+                ? 0
+                : 1
         ]);
     });
 
     /*
-    SIZE
+    DATASIZE
     */
 
-    const dataSize = chunks.length - 14;
+    const dataSize =
+        bytes.length - 14;
 
-    chunks[4] = dataSize & 255;
-    chunks[5] = (dataSize>>8)&255;
-    chunks[6] = (dataSize>>16)&255;
-    chunks[7] = (dataSize>>24)&255;
+    bytes[4] = dataSize & 255;
+    bytes[5] = (dataSize>>8)&255;
+    bytes[6] = (dataSize>>16)&255;
+    bytes[7] = (dataSize>>24)&255;
 
     /*
     CRC
     */
 
-    const crc = crc16(chunks);
+    const crc = crc16(bytes);
 
-    chunks.push(crc & 255);
-    chunks.push((crc>>8)&255);
+    bytes.push(crc & 255);
+    bytes.push((crc>>8)&255);
 
-    return new Uint8Array(chunks);
+    return new Uint8Array(bytes);
 }
 
 /*
@@ -474,12 +511,16 @@ function downloadFit(data){
 
     const blob = new Blob(
         [data],
-        {type:'application/octet-stream'}
+        {
+            type:'application/octet-stream'
+        }
     );
 
-    const url = URL.createObjectURL(blob);
+    const url =
+        URL.createObjectURL(blob);
 
-    const a = document.createElement('a');
+    const a =
+        document.createElement('a');
 
     a.href = url;
     a.download = 'processed.fit';
@@ -501,41 +542,49 @@ document
 
     try{
 
+        logEl.innerHTML = '';
+
         if(!loadedFiles.length){
 
-            alert('Carica almeno un FIT');
+            alert(
+                'Seleziona almeno un file FIT'
+            );
+
             return;
         }
 
-        logEl.innerHTML = '';
-
-        log("Parsing FIT...");
+        log('Parsing FIT...');
 
         const activities = [];
 
         for(const file of loadedFiles){
 
-            log("Parsing: " + file.name);
+            log('Parsing: ' + file.name);
 
-            const parsed = await parseFit(file);
+            const parsed =
+                await parseFit(file);
 
             activities.push(parsed);
         }
 
         /*
-        ORDINE CRONOLOGICO
+        SORT
         */
 
         activities.sort((a,b)=>{
 
             const ta =
                 new Date(
-                    a.activity.sessions[0].start_time
+                    a.activity
+                    .sessions[0]
+                    .start_time
                 );
 
             const tb =
                 new Date(
-                    b.activity.sessions[0].start_time
+                    b.activity
+                    .sessions[0]
+                    .start_time
                 );
 
             return ta - tb;
@@ -548,20 +597,27 @@ document
         const records =
             mergeActivities(activities);
 
-        log("Records: " + records.length);
+        log(
+            'Records: ' +
+            records.length
+        );
 
         /*
-        DETECT PAUSES
+        PAUSES
         */
 
         const minSpeed =
             parseFloat(
-                document.getElementById('minSpeed').value
+                document
+                .getElementById('minSpeed')
+                .value
             );
 
         const minPause =
             parseInt(
-                document.getElementById('minPause').value
+                document
+                .getElementById('minPause')
+                .value
             );
 
         const pauseEvents =
@@ -571,16 +627,23 @@ document
                 minPause
             );
 
-        log("Pause trovate: " + pauseEvents.length);
+        log(
+            'Pause trovate: '
+            +
+            pauseEvents.length
+        );
 
         /*
-        CREATE FIT
+        FIT
         */
 
-        log("Generazione FIT...");
+        log('Creazione FIT...');
 
         const fitData =
-            createFit(records, pauseEvents);
+            createFit(
+                records,
+                pauseEvents
+            );
 
         /*
         DOWNLOAD
@@ -588,7 +651,7 @@ document
 
         downloadFit(fitData);
 
-        log("DONE");
+        log('DONE');
 
     }catch(err){
 
