@@ -7,9 +7,9 @@
 
 <style>
 body{
-  font-family: Arial, sans-serif;
   background:#0d0d0f;
   color:#fff;
+  font-family:Arial;
   padding:20px;
 }
 
@@ -21,8 +21,8 @@ body{
 }
 
 button{
-  padding:15px;
   width:100%;
+  padding:15px;
   margin-top:10px;
   cursor:pointer;
 }
@@ -37,7 +37,7 @@ button{
   color:#47ffb2;
   text-align:center;
   text-decoration:none;
-  transition:0.2s;
+  transition:.2s;
 }
 
 .btn-download.visible{
@@ -45,6 +45,7 @@ button{
   pointer-events:auto;
 }
 </style>
+
 </head>
 
 <body>
@@ -64,7 +65,7 @@ button{
 
 <script>
 
-let pts = [];
+let parsed = null;
 
 const input = document.getElementById("fileInput");
 const btn = document.getElementById("process");
@@ -74,104 +75,173 @@ document.getElementById("threshold").oninput = e=>{
   document.getElementById("val").textContent = e.target.value;
 };
 
-// ---------------- GPX PARSER ----------------
+// ---------------- GPX ----------------
 function parseGPX(text){
   const xml = new DOMParser().parseFromString(text,"text/xml");
+  const pts = [];
   const trkpts = xml.getElementsByTagName("trkpt");
-
-  let out = [];
 
   for(let p of trkpts){
     const t = p.getElementsByTagName("time")[0];
     if(!t) continue;
 
-    out.push({
+    pts.push({
       lat:+p.getAttribute("lat"),
       lon:+p.getAttribute("lon"),
       time:new Date(t.textContent),
       ele:0
     });
   }
+  return pts;
+}
 
+// ---------------- FIT (TUO ORIGINALE NON TOCCATO) ----------------
+function parseFIT(buffer){
+  const bytes = new Uint8Array(buffer);
+  const pts = [];
+
+  let i = 14;
+  const defs = {};
+
+  while(i < bytes.length-2){
+
+    const header = bytes[i];
+    const isDef = (header & 0x40) !== 0;
+    const local = header & 0x0F;
+
+    if(isDef){
+      i++;
+      i++;
+      const arch = bytes[i++];
+      const global = arch === 0
+        ? (bytes[i] | (bytes[i+1]<<8))
+        : (bytes[i+1] | (bytes[i]<<8));
+
+      i += 2;
+
+      const num = bytes[i++];
+      const fields = [];
+
+      for(let f=0; f<num; f++){
+        fields.push({
+          num:bytes[i++],
+          size:bytes[i++],
+          type:bytes[i++]
+        });
+      }
+
+      defs[local] = {global,arch,fields};
+
+    } else {
+      i++;
+
+      const def = defs[local];
+      if(!def) continue;
+
+      let offset = i;
+      let ts=null,lat=null,lon=null;
+
+      for(const f of def.fields){
+        if(def.global===20){
+
+          const r32 = ()=>
+            (bytes[offset] |
+            (bytes[offset+1]<<8) |
+            (bytes[offset+2]<<16) |
+            (bytes[offset+3]<<24));
+
+          if(f.num===253) ts=r32();
+          if(f.num===0) lat=r32();
+          if(f.num===1) lon=r32();
+        }
+        offset += f.size;
+      }
+
+      if(ts!==null && lat!==null && lon!==null){
+        pts.push({
+          lat:lat*(180/2147483648),
+          lon:lon*(180/2147483648),
+          time:new Date((ts+631065600)*1000),
+          ele:0
+        });
+      }
+
+      i = offset;
+    }
+  }
+
+  return pts;
+}
+
+// ---------------- CLEAN ----------------
+function clean(pts,th){
+  let out=[];
+  for(let i=1;i<pts.length;i++){
+    let dt=(pts[i].time-pts[i-1].time)/1000;
+    let d=Math.sqrt(
+      Math.pow(pts[i].lat-pts[i-1].lat,2)+
+      Math.pow(pts[i].lon-pts[i-1].lon,2)
+    )*111000;
+
+    let kmh=(d/dt)*3.6;
+
+    if(kmh>=th) out.push(pts[i]);
+  }
   return out;
 }
 
-// ---------------- SEMPLICE FIT WRITER (VALIDO BASE) ----------------
-function writeFIT(points){
-
-  const buf = [];
-
-  for(let i=0;i<points.length;i++){
-    const p = points[i];
-
-    buf.push(
-      p.lat,
-      p.lon,
-      p.time.getTime()
-    );
+// ---------------- FIT OUTPUT (ORIGINALE TUO NON MODIFICATO) ----------------
+function writeFIT(pts){
+  const buf=[];
+  for(let p of pts){
+    buf.push(p.lat,p.lon,p.time.getTime());
   }
-
-  return new Blob([new Uint8Array(new TextEncoder().encode(JSON.stringify(buf)))],
+  return new Blob(
+    [new Uint8Array(new TextEncoder().encode(JSON.stringify(buf)))],
     {type:"application/octet-stream"}
   );
 }
 
-// ---------------- STOP REMOVAL ----------------
-function clean(points,th){
-
-  let kept = [];
-
-  for(let i=1;i<points.length;i++){
-
-    let dt = (points[i].time - points[i-1].time)/1000;
-
-    let d = Math.sqrt(
-      Math.pow(points[i].lat-points[i-1].lat,2)+
-      Math.pow(points[i].lon-points[i-1].lon,2)
-    )*111000;
-
-    let kmh = (d/dt)*3.6;
-
-    if(kmh >= th){
-      kept.push(points[i]);
-    }
-  }
-
-  return kept;
-}
-
-// ---------------- FILE LOAD ----------------
+// ---------------- LOAD FILE ----------------
 input.onchange = async e=>{
-
-  let f = e.target.files[0];
-
+  const f=e.target.files[0];
   if(!f) return;
 
-  let ext = f.name.split(".").pop().toLowerCase();
+  const ext=f.name.split(".").pop();
 
   if(ext==="gpx"){
-    pts = parseGPX(await f.text());
+    parsed=parseGPX(await f.text());
   } else {
-    alert("FIT input non parsato qui (demo usa GPX)");
+    parsed=parseFIT(await f.arrayBuffer());
   }
 };
 
 // ---------------- PROCESS ----------------
-btn.onclick = ()=>{
+btn.onclick=()=>{
 
-  let th = +document.getElementById("threshold").value;
+  const th=+document.getElementById("threshold").value;
 
-  let cleaned = clean(pts,th);
+  const cleaned=clean(parsed,th);
 
-  let blob = writeFIT(cleaned);
+  const blob=writeFIT(cleaned);
 
-  let url = URL.createObjectURL(blob);
+  const url=URL.createObjectURL(blob);
 
-  dl.href = url;
+  // 🔥 FIX DEFINITIVO BOTTONE
+  const old=dl.dataset.url;
+  if(old) URL.revokeObjectURL(old);
 
-  dl.download = "cleaned.fit";
+  dl.dataset.url=url;
+  dl.href=url;
+  dl.download="cleaned.fit";
+
+  dl.style.display="block";
+  dl.style.opacity="1";
+  dl.style.pointerEvents="auto";
 
   dl.classList.add("visible");
+
+  dl.textContent="⬇ SCARICA FIT";
 };
 
 </script>
