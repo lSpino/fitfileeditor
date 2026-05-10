@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>FIT Cleaner — rimuovi le soste LS</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>FIT Cleaner</title>
 
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@300;600;800&display=swap" rel="stylesheet">
 
 <style>
+
 :root{
   --bg:#0d0d0f;
   --surface:#16161a;
@@ -69,7 +71,7 @@ header{
 
 h1{
   font-family:'Barlow Condensed', sans-serif;
-  font-size:clamp(3rem, 8vw, 5.5rem);
+  font-size:clamp(3rem,8vw,5.5rem);
   font-weight:800;
   line-height:.95;
   letter-spacing:-.01em;
@@ -185,7 +187,6 @@ main{
   width:14px;
   height:14px;
   background:var(--accent);
-  border-radius:0;
   cursor:pointer;
 }
 
@@ -209,23 +210,12 @@ main{
   letter-spacing:.12em;
   text-transform:uppercase;
   cursor:pointer;
-  transition:opacity .15s, transform .1s;
   margin-bottom:1.5rem;
-}
-
-.btn-process:hover{
-  opacity:.9;
-  transform:translateY(-1px);
-}
-
-.btn-process:active{
-  transform:translateY(0);
 }
 
 .btn-process:disabled{
   opacity:.3;
   cursor:not-allowed;
-  transform:none;
 }
 
 .stats{
@@ -234,32 +224,20 @@ main{
   border:1px solid var(--border);
   padding:1.5rem;
   margin-bottom:1.5rem;
-  animation:fadeIn .3s ease;
 }
 
 .stats.visible{
   display:block;
 }
 
-@keyframes fadeIn{
-  from{
-    opacity:0;
-    transform:translateY(8px);
-  }
-  to{
-    opacity:1;
-    transform:none;
-  }
-}
-
 .stats-grid{
   display:grid;
   grid-template-columns:repeat(3,1fr);
   gap:1rem;
-  margin-bottom:1.2rem;
+  margin-bottom:1rem;
 }
 
-@media (max-width:500px){
+@media(max-width:500px){
   .stats-grid{
     grid-template-columns:1fr 1fr;
   }
@@ -278,7 +256,6 @@ main{
   font-family:'Barlow Condensed', sans-serif;
   font-size:1.8rem;
   font-weight:600;
-  line-height:1;
 }
 
 .val.good{
@@ -303,13 +280,12 @@ main{
 .progress-fill{
   height:100%;
   background:var(--accent);
-  transition:width .4s ease;
+  transition:width .3s ease;
 }
 
 .stats-log{
   font-size:.7rem;
   color:var(--muted);
-  line-height:1.8;
 }
 
 .stats-log span{
@@ -329,9 +305,11 @@ main{
   letter-spacing:.1em;
   text-transform:uppercase;
   cursor:pointer;
-  transition:all .15s;
   text-align:center;
   text-decoration:none;
+
+  position:relative;
+  z-index:9999;
 }
 
 .btn-download.visible{
@@ -345,11 +323,11 @@ main{
 
 .error-msg{
   display:none;
-  padding:1rem 1.2rem;
+  padding:1rem;
   border:1px solid var(--danger);
   color:var(--danger);
-  font-size:.75rem;
   margin-bottom:1rem;
+  font-size:.75rem;
 }
 
 .error-msg.visible{
@@ -376,16 +354,18 @@ footer{
   font-size:.65rem;
   letter-spacing:.1em;
   text-align:center;
-  z-index:1;
-  position:relative;
 }
+
 </style>
 </head>
 
 <body>
 
 <header>
-  <span class="badge">FIT Tool</span>
+
+  <span class="badge">
+    FIT Tool
+  </span>
 
   <h1>
     STOP<br>
@@ -395,11 +375,13 @@ footer{
   <p class="subtitle">
     // input GPX/FIT → output FIT pulito senza soste
   </p>
+
 </header>
 
 <main>
 
   <div class="dropzone" id="dropzone">
+
     <input type="file" id="fileInput" accept=".gpx,.fit">
 
     <span class="drop-icon">📂</span>
@@ -411,6 +393,7 @@ footer{
     <span class="drop-sub">
       GPX o FIT — output sempre FIT
     </span>
+
   </div>
 
   <div class="file-name" id="fileName"></div>
@@ -418,9 +401,13 @@ footer{
   <div class="settings">
 
     <div class="field">
-      <label>Soglia sosta (km/h)</label>
+
+      <label>
+        Soglia sosta (km/h)
+      </label>
 
       <div class="field-row">
+
         <input
           type="range"
           id="threshold"
@@ -433,7 +420,9 @@ footer{
         <span class="field-val" id="thresholdVal">
           2.0
         </span>
+
       </div>
+
     </div>
 
   </div>
@@ -522,17 +511,20 @@ function haversine(lat1, lon1, lat2, lon2){
 
   const a =
     Math.sin(dp/2)**2 +
-    Math.cos(p1) *
-    Math.cos(p2) *
+    Math.cos(p1)*Math.cos(p2)*
     Math.sin(dl/2)**2;
 
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * 2 * Math.atan2(
+    Math.sqrt(a),
+    Math.sqrt(1-a)
+  );
 }
 
 function fmtTime(sec){
 
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
+  const h = Math.floor(sec/3600);
+
+  const m = Math.floor((sec%3600)/60);
 
   return `${h}h ${m}min`;
 }
@@ -541,32 +533,37 @@ function parseGPX(text){
 
   const parser = new DOMParser();
 
-  const doc = parser.parseFromString(text, 'text/xml');
-
-  const ns = 'http://www.topografix.com/GPX/1/1';
-
-  const getEl = (el, tag) =>
-    el.getElementsByTagNameNS(ns, tag)[0]
-    || el.getElementsByTagName(tag)[0];
+  const doc =
+    parser.parseFromString(
+      text,
+      'text/xml'
+    );
 
   const pts = [];
 
   const trkpts =
-    doc.getElementsByTagNameNS(ns, 'trkpt').length > 0
-    ? doc.getElementsByTagNameNS(ns, 'trkpt')
-    : doc.getElementsByTagName('trkpt');
+    doc.getElementsByTagName('trkpt');
 
   for(const pt of trkpts){
 
-    const timeEl = getEl(pt, 'time');
-    const eleEl  = getEl(pt, 'ele');
+    const timeEl =
+      pt.getElementsByTagName('time')[0];
 
     if(!timeEl) continue;
 
+    const eleEl =
+      pt.getElementsByTagName('ele')[0];
+
     pts.push({
+
       lat: parseFloat(pt.getAttribute('lat')),
+
       lon: parseFloat(pt.getAttribute('lon')),
-      ele: eleEl ? parseFloat(eleEl.textContent) : 0,
+
+      ele: eleEl
+        ? parseFloat(eleEl.textContent)
+        : 0,
+
       time: new Date(timeEl.textContent)
     });
   }
@@ -578,8 +575,6 @@ function parseGPX(text){
 }
 
 function parseFIT(buffer){
-
-  const data = new DataView(buffer);
 
   const bytes = new Uint8Array(buffer);
 
@@ -595,16 +590,19 @@ function parseFIT(buffer){
 
     const header = bytes[i];
 
-    const isCompressed = (header & 0x80) !== 0;
+    const isCompressed =
+      (header & 0x80) !== 0;
 
     if(isCompressed){
       i++;
       continue;
     }
 
-    const isDef = (header & 0x40) !== 0;
+    const isDef =
+      (header & 0x40) !== 0;
 
-    const localMsgNum = header & 0x0F;
+    const localMsgNum =
+      header & 0x0F;
 
     if(isDef){
 
@@ -616,8 +614,16 @@ function parseFIT(buffer){
 
       const globalMsgNum =
         arch === 0
-        ? (bytes[i] | (bytes[i+1] << 8))
-        : (bytes[i+1] | (bytes[i] << 8));
+        ? (
+          bytes[i]
+          |
+          (bytes[i+1] << 8)
+        )
+        : (
+          (bytes[i] << 8)
+          |
+          bytes[i+1]
+        );
 
       i += 2;
 
@@ -644,7 +650,8 @@ function parseFIT(buffer){
 
       i++;
 
-      const def = definitions[localMsgNum];
+      const def =
+        definitions[localMsgNum];
 
       if(!def){
         continue;
@@ -665,7 +672,7 @@ function parseFIT(buffer){
 
           const read32s = () => {
 
-            const v = le
+            return le
               ? (
                 bytes[offset]
                 |
@@ -684,16 +691,23 @@ function parseFIT(buffer){
                 |
                 bytes[offset+3]
               );
-
-            return v;
           };
 
-          const read32u = () => read32s() >>> 0;
+          const read32u =
+            () => read32s() >>> 0;
 
           const read16u = () =>
             le
-            ? (bytes[offset] | (bytes[offset+1] << 8))
-            : ((bytes[offset] << 8) | bytes[offset+1]);
+            ? (
+              bytes[offset]
+              |
+              (bytes[offset+1] << 8)
+            )
+            : (
+              (bytes[offset] << 8)
+              |
+              bytes[offset+1]
+            );
 
           if(field.num === 253){
             ts = read32u();
@@ -727,15 +741,23 @@ function parseFIT(buffer){
 
         pts.push({
 
-          lat: lat * (180 / 2147483648),
+          lat:
+            lat * (
+              180 / 2147483648
+            ),
 
-          lon: lon * (180 / 2147483648),
+          lon:
+            lon * (
+              180 / 2147483648
+            ),
 
-          ele: (ele / 5) - 500,
+          ele:
+            (ele / 5) - 500,
 
-          time: new Date(
-            (ts + 631065600) * 1000
-          )
+          time:
+            new Date(
+              (ts + 631065600) * 1000
+            )
         });
       }
 
@@ -754,7 +776,7 @@ function removeStops(pts, thresholdKmh){
   if(pts.length < 2){
 
     return {
-      kept: pts,
+      kept:pts,
       removed:0,
       movingTime:0,
       stoppedTime:0,
@@ -762,7 +784,8 @@ function removeStops(pts, thresholdKmh){
     };
   }
 
-  const keepFlags = new Array(pts.length).fill(true);
+  const keepFlags =
+    new Array(pts.length).fill(true);
 
   let movingTime = 0;
   let stoppedTime = 0;
@@ -771,7 +794,8 @@ function removeStops(pts, thresholdKmh){
   for(let i=1; i<pts.length; i++){
 
     const dt =
-      (pts[i].time - pts[i-1].time) / 1000;
+      (pts[i].time - pts[i-1].time)
+      / 1000;
 
     if(dt <= 0){
 
@@ -787,7 +811,7 @@ function removeStops(pts, thresholdKmh){
       pts[i].lon
     );
 
-    const kmh = (d / dt) * 3.6;
+    const kmh = (d/dt)*3.6;
 
     totalDist += d;
 
@@ -795,7 +819,7 @@ function removeStops(pts, thresholdKmh){
 
       stoppedTime += dt;
 
-      if(i !== pts.length - 1){
+      if(i !== pts.length-1){
         keepFlags[i] = false;
       }
 
@@ -805,11 +829,15 @@ function removeStops(pts, thresholdKmh){
     }
   }
 
-  const kept = pts.filter((_,i)=>keepFlags[i]);
-
   return {
-    kept,
-    removed: pts.length - kept.length,
+
+    kept:
+      pts.filter((_,i)=>keepFlags[i]),
+
+    removed:
+      pts.length -
+      pts.filter((_,i)=>keepFlags[i]).length,
+
     movingTime,
     stoppedTime,
     totalDist
@@ -822,7 +850,9 @@ function writeFIT(pts){
 
   function fitTimestamp(date){
 
-    return Math.floor(date.getTime() / 1000) - FIT_EPOCH;
+    return Math.floor(
+      date.getTime()/1000
+    ) - FIT_EPOCH;
   }
 
   function semicircles(deg){
@@ -845,17 +875,20 @@ function writeFIT(pts){
 
     for(const byte of buffer){
 
-      let tmp = crcTable[crc & 0xF];
+      let tmp =
+        crcTable[crc & 0xF];
 
       crc = (crc >> 4) & 0x0FFF;
 
       crc ^= tmp ^ crcTable[byte & 0xF];
 
-      tmp = crcTable[crc & 0xF];
+      tmp =
+        crcTable[crc & 0xF];
 
       crc = (crc >> 4) & 0x0FFF;
 
-      crc ^= tmp ^ crcTable[(byte >> 4) & 0xF];
+      crc ^= tmp ^
+        crcTable[(byte >> 4) & 0xF];
     }
 
     return crc;
@@ -864,6 +897,7 @@ function writeFIT(pts){
   const chunks = [];
 
   function push(arr){
+
     chunks.push(Uint8Array.from(arr));
   }
 
@@ -881,23 +915,28 @@ function writeFIT(pts){
     0x03,0x04,0x86
   ]);
 
-  const startTs = fitTimestamp(pts[0].time);
+  const startTs =
+    fitTimestamp(pts[0].time);
 
-  const fileId = new ArrayBuffer(11);
+  const fileId =
+    new ArrayBuffer(11);
 
-  const fd = new DataView(fileId);
+  const fd =
+    new DataView(fileId);
 
-  fd.setUint8(0, 0x00);
+  fd.setUint8(0,0x00);
 
-  fd.setUint8(1, 4);
+  fd.setUint8(1,4);
 
-  fd.setUint16(2, 1, true);
+  fd.setUint16(2,1,true);
 
-  fd.setUint32(4, 0, true);
+  fd.setUint32(4,0,true);
 
-  fd.setUint32(8, startTs, true);
+  fd.setUint32(8,startTs,true);
 
-  chunks.push(new Uint8Array(fileId));
+  chunks.push(
+    new Uint8Array(fileId)
+  );
 
   push([
     0x41,
@@ -915,11 +954,13 @@ function writeFIT(pts){
 
   for(const pt of pts){
 
-    const rec = new ArrayBuffer(15);
+    const rec =
+      new ArrayBuffer(15);
 
-    const dv = new DataView(rec);
+    const dv =
+      new DataView(rec);
 
-    dv.setUint8(0, 0x01);
+    dv.setUint8(0,0x01);
 
     dv.setUint32(
       1,
@@ -939,23 +980,25 @@ function writeFIT(pts){
       true
     );
 
-    const altitude = Math.round(
-      (pt.ele + 500) * 5
-    );
-
     dv.setUint16(
       13,
-      altitude,
+      Math.round((pt.ele+500)*5),
       true
     );
 
-    chunks.push(new Uint8Array(rec));
+    chunks.push(
+      new Uint8Array(rec)
+    );
   }
 
   const dataSize =
-    chunks.reduce((s,c)=>s+c.length,0);
+    chunks.reduce(
+      (s,c)=>s+c.length,
+      0
+    );
 
-  const data = new Uint8Array(dataSize);
+  const data =
+    new Uint8Array(dataSize);
 
   let offset = 0;
 
@@ -968,27 +1011,32 @@ function writeFIT(pts){
 
   const dataCrc = crc16(data);
 
-  const fitData = new Uint8Array(dataSize + 2);
+  const fitData =
+    new Uint8Array(dataSize + 2);
 
   fitData.set(data);
 
-  fitData[dataSize] = dataCrc & 0xFF;
+  fitData[dataSize] =
+    dataCrc & 0xFF;
 
-  fitData[dataSize + 1] =
+  fitData[dataSize+1] =
     (dataCrc >> 8) & 0xFF;
 
-  const header = new Uint8Array(14);
+  const header =
+    new Uint8Array(14);
 
   header[0] = 14;
-
   header[1] = 0x10;
 
   header[2] = 0x64;
   header[3] = 0x08;
 
-  const dvh = new DataView(header.buffer);
-
-  dvh.setUint32(4, fitData.length, true);
+  new DataView(header.buffer)
+    .setUint32(
+      4,
+      fitData.length,
+      true
+    );
 
   header[8] = 0x2E;
   header[9] = 0x46;
@@ -998,50 +1046,67 @@ function writeFIT(pts){
   const headerCrc =
     crc16(header.slice(0,12));
 
-  header[12] = headerCrc & 0xFF;
+  header[12] =
+    headerCrc & 0xFF;
 
   header[13] =
     (headerCrc >> 8) & 0xFF;
 
-  const finalFile = new Uint8Array(
-    header.length + fitData.length
+  const finalFile =
+    new Uint8Array(
+      header.length +
+      fitData.length
+    );
+
+  finalFile.set(header,0);
+
+  finalFile.set(
+    fitData,
+    header.length
   );
-
-  finalFile.set(header, 0);
-
-  finalFile.set(fitData, header.length);
 
   return finalFile.buffer;
 }
 
 let currentFile = null;
-
 let currentParsed = null;
 
-const dropzone = document.getElementById('dropzone');
+const dropzone =
+  document.getElementById('dropzone');
 
-const fileInput = document.getElementById('fileInput');
+const fileInput =
+  document.getElementById('fileInput');
 
-const btnProcess = document.getElementById('btnProcess');
+const btnProcess =
+  document.getElementById('btnProcess');
 
-const btnDl = document.getElementById('btnDownload');
+const btnDl =
+  document.getElementById('btnDownload');
 
-const statsPanel = document.getElementById('statsPanel');
+const statsPanel =
+  document.getElementById('statsPanel');
 
-const errorMsg = document.getElementById('errorMsg');
+const errorMsg =
+  document.getElementById('errorMsg');
 
-const fileNameEl = document.getElementById('fileName');
+const fileNameEl =
+  document.getElementById('fileName');
 
-const threshold = document.getElementById('threshold');
+const threshold =
+  document.getElementById('threshold');
 
-const threshVal = document.getElementById('thresholdVal');
+const threshVal =
+  document.getElementById('thresholdVal');
 
-const progress = document.getElementById('progressFill');
+const progress =
+  document.getElementById('progressFill');
 
 threshold.addEventListener('input', ()=>{
 
   threshVal.textContent =
-    parseFloat(threshold.value).toFixed(1);
+    parseFloat(
+      threshold.value
+    ).toFixed(1);
 });
 
 dropzone.addEventListener('dragover', e=>{
@@ -1064,7 +1129,9 @@ dropzone.addEventListener('drop', e=>{
 
   if(e.dataTransfer.files[0]){
 
-    handleFile(e.dataTransfer.files[0]);
+    handleFile(
+      e.dataTransfer.files[0]
+    );
   }
 });
 
@@ -1124,15 +1191,19 @@ async function handleFile(file){
 
     if(ext === 'gpx'){
 
-      const text = await file.text();
+      const text =
+        await file.text();
 
-      currentParsed = parseGPX(text);
+      currentParsed =
+        parseGPX(text);
 
     } else {
 
-      const buf = await file.arrayBuffer();
+      const buf =
+        await file.arrayBuffer();
 
-      currentParsed = parseFIT(buf);
+      currentParsed =
+        parseFIT(buf);
     }
 
     if(!currentParsed.pts.length){
@@ -1147,7 +1218,8 @@ async function handleFile(file){
   } catch(e){
 
     showError(
-      'Errore lettura file: ' + e.message
+      'Errore lettura file: ' +
+      e.message
     );
   }
 }
@@ -1162,9 +1234,11 @@ btnProcess.addEventListener('click', async ()=>{
 
   statsPanel.classList.add('visible');
 
-  progress.style.width = '10%';
+  progress.style.width = '15%';
 
-  await new Promise(r=>setTimeout(r,30));
+  await new Promise(
+    r=>setTimeout(r,30)
+  );
 
   const thresh =
     parseFloat(threshold.value);
@@ -1182,44 +1256,53 @@ btnProcess.addEventListener('click', async ()=>{
 
   progress.style.width = '60%';
 
-  await new Promise(r=>setTimeout(r,30));
-
   const totalTime =
     movingTime + stoppedTime;
 
   const velOld =
-    totalDist/1000 / (totalTime/3600);
+    totalDist/1000 /
+    (totalTime/3600);
 
   const velNew =
     movingTime > 0
-    ? totalDist/1000 / (movingTime/3600)
+    ? totalDist/1000 /
+      (movingTime/3600)
     : 0;
 
-  document.getElementById('statDist').textContent =
-    (totalDist/1000).toFixed(1);
+  document.getElementById('statDist')
+    .textContent =
+      (totalDist/1000).toFixed(1);
 
-  document.getElementById('statVelOld').textContent =
-    velOld.toFixed(1);
+  document.getElementById('statVelOld')
+    .textContent =
+      velOld.toFixed(1);
 
-  document.getElementById('statVelNew').textContent =
-    velNew.toFixed(1);
+  document.getElementById('statVelNew')
+    .textContent =
+      velNew.toFixed(1);
 
-  document.getElementById('statTimeTotal').textContent =
-    fmtTime(totalTime);
+  document.getElementById('statTimeTotal')
+    .textContent =
+      fmtTime(totalTime);
 
-  document.getElementById('statTimeStopped').textContent =
-    fmtTime(stoppedTime);
+  document.getElementById('statTimeStopped')
+    .textContent =
+      fmtTime(stoppedTime);
 
-  document.getElementById('statRemoved').textContent =
-    removed + ' pt';
+  document.getElementById('statRemoved')
+    .textContent =
+      removed + ' pt';
 
-  document.getElementById('statsLog').innerHTML =
-    `<span>${currentParsed.pts.length}</span> punti originali → ` +
-    `<span>${kept.length}</span> punti mantenuti`;
+  document.getElementById('statsLog')
+    .innerHTML =
+      `<span>${currentParsed.pts.length}</span> punti → ` +
+      `<span>${kept.length}</span> mantenuti`;
 
   progress.style.width = '85%';
 
-  await new Promise(r=>setTimeout(r,30));
+  await new Promise(
+    r=>setTimeout(r,30)
+  );
 
   const fitBuf = writeFIT(kept);
 
@@ -1236,20 +1319,35 @@ btnProcess.addEventListener('click', async ()=>{
       '_cleaned.fit'
     );
 
-  const url = URL.createObjectURL(blob);
+  const oldUrl =
+    btnDl.dataset.url;
+
+  if(oldUrl){
+
+    URL.revokeObjectURL(oldUrl);
+  }
+
+  const url =
+    URL.createObjectURL(blob);
+
+  btnDl.dataset.url = url;
 
   btnDl.href = url;
 
   btnDl.download = filename;
 
-  progress.style.width = '100%';
+  btnDl.style.display = 'block';
 
-  await new Promise(r=>setTimeout(r,200));
+  btnDl.style.visibility = 'visible';
+
+  btnDl.style.opacity = '1';
 
   btnDl.classList.add('visible');
 
   btnDl.textContent =
     `⬇ SCARICA ${filename}`;
+
+  progress.style.width = '100%';
 });
 
 </script>
