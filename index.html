@@ -1,47 +1,478 @@
 <!DOCTYPE html>
-<html>
+<html lang="it">
 <head>
 <meta charset="UTF-8">
-<title>Test FIT</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>FIT Pause Tool</title>
+
+<script src="https://cdn.jsdelivr.net/npm/fit-file-parser/dist/fit-file-parser.min.js"></script>
+
+<style>
+
+body{
+    font-family:Arial;
+    background:#f2f2f2;
+    padding:40px;
+}
+
+.box{
+    background:white;
+    max-width:900px;
+    margin:auto;
+    padding:30px;
+    border-radius:12px;
+    box-shadow:0 0 10px rgba(0,0,0,.1);
+}
+
+button{
+    padding:14px 20px;
+    font-size:16px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    background:#0077ff;
+    color:white;
+    margin-top:10px;
+}
+
+button:hover{
+    opacity:.9;
+}
+
+#log{
+    margin-top:20px;
+    background:#111;
+    color:#0f0;
+    padding:15px;
+    border-radius:10px;
+    height:300px;
+    overflow:auto;
+    font-family:monospace;
+}
+
+.settings{
+    margin-top:20px;
+}
+
+.settings input{
+    padding:8px;
+    width:100px;
+}
+
+</style>
 </head>
 
 <body>
 
-<input type="file" id="fileInput" multiple accept=".fit">
+<div class="box">
 
-<button id="btn">
-Apri file
-</button>
+    <h1>FIT Pause & Merge Tool</h1>
 
-<div id="out"></div>
+    <input
+        type="file"
+        id="fileInput"
+        multiple
+        accept=".fit"
+    >
+
+    <br>
+
+    <div class="settings">
+
+        Velocità pausa (km/h):
+        <input
+            type="number"
+            id="minSpeed"
+            value="1"
+            step="0.1"
+        >
+
+        Durata pausa (sec):
+        <input
+            type="number"
+            id="minPause"
+            value="15"
+        >
+
+    </div>
+
+    <button id="processBtn">
+        Processa FIT
+    </button>
+
+    <div id="log"></div>
+
+</div>
 
 <script>
 
-const btn =
-    document.getElementById('btn');
+const logEl =
+    document.getElementById('log');
 
-const input =
-    document.getElementById('fileInput');
+function log(msg){
 
-const out =
-    document.getElementById('out');
+    console.log(msg);
 
-btn.addEventListener('click', ()=>{
+    logEl.innerHTML += msg + "<br>";
 
-    input.click();
+    logEl.scrollTop =
+        logEl.scrollHeight;
+}
 
-});
+/*
+========================================
+PARSE FIT
+========================================
+*/
 
-input.addEventListener('change', ()=>{
+function parseFit(file){
 
-    out.innerHTML = '';
+    return new Promise(async (resolve,reject)=>{
 
-    [...input.files].forEach(f=>{
+        try{
 
-        out.innerHTML +=
-            f.name + '<br>';
+            const buffer =
+                await file.arrayBuffer();
+
+            const parser =
+                new FitParser({
+                    force: true,
+                    speedUnit: 'm/s',
+                    lengthUnit: 'm',
+                    temperatureUnit: 'celsius',
+                    elapsedRecordField: true,
+                    mode: 'cascade'
+                });
+
+            parser.parse(
+                buffer,
+                function(error, data){
+
+                    if(error){
+
+                        reject(error);
+
+                    }else{
+
+                        resolve(data);
+                    }
+                }
+            );
+
+        }catch(err){
+
+            reject(err);
+        }
 
     });
+}
+
+/*
+========================================
+MERGE RECORDS
+========================================
+*/
+
+function mergeRecords(activities){
+
+    let records = [];
+
+    activities.forEach(a=>{
+
+        if(a.records){
+
+            records.push(...a.records);
+        }
+    });
+
+    records.sort((a,b)=>{
+
+        return (
+            new Date(a.timestamp)
+            -
+            new Date(b.timestamp)
+        );
+    });
+
+    return records;
+}
+
+/*
+========================================
+DETECT PAUSES
+========================================
+*/
+
+function detectPauses(
+    records,
+    minSpeedKmh,
+    minPauseSeconds
+){
+
+    const minSpeed =
+        minSpeedKmh / 3.6;
+
+    let paused = false;
+
+    let stopCandidate = null;
+
+    const events = [];
+
+    for(let i=0; i<records.length; i++){
+
+        const r = records[i];
+
+        if(!r.timestamp) continue;
+
+        const speed = r.speed || 0;
+
+        const ts =
+            new Date(r.timestamp);
+
+        if(speed < minSpeed){
+
+            if(!stopCandidate){
+
+                stopCandidate = ts;
+            }
+
+            const duration =
+                (ts - stopCandidate)
+                / 1000;
+
+            if(
+                duration >= minPauseSeconds
+                &&
+                !paused
+            ){
+
+                paused = true;
+
+                events.push({
+                    type:'stop',
+                    timestamp:stopCandidate
+                });
+
+                log(
+                    'STOP → '
+                    +
+                    stopCandidate
+                    .toLocaleTimeString()
+                );
+            }
+
+        }else{
+
+            stopCandidate = null;
+
+            if(paused){
+
+                paused = false;
+
+                events.push({
+                    type:'start',
+                    timestamp:ts
+                });
+
+                log(
+                    'START → '
+                    +
+                    ts.toLocaleTimeString()
+                );
+            }
+        }
+    }
+
+    return events;
+}
+
+/*
+========================================
+DOWNLOAD TXT DEBUG
+========================================
+*/
+
+function downloadText(text){
+
+    const blob =
+        new Blob(
+            [text],
+            {type:'text/plain'}
+        );
+
+    const url =
+        URL.createObjectURL(blob);
+
+    const a =
+        document.createElement('a');
+
+    a.href = url;
+
+    a.download = 'pause-events.txt';
+
+    a.click();
+
+    URL.revokeObjectURL(url);
+}
+
+/*
+========================================
+MAIN
+========================================
+*/
+
+document
+.getElementById('processBtn')
+.addEventListener('click', async ()=>{
+
+    try{
+
+        logEl.innerHTML = '';
+
+        const files =
+            [
+                ...document
+                .getElementById('fileInput')
+                .files
+            ];
+
+        if(!files.length){
+
+            alert(
+                'Seleziona almeno un FIT'
+            );
+
+            return;
+        }
+
+        log(
+            'File caricati: '
+            +
+            files.length
+        );
+
+        const activities = [];
+
+        /*
+        PARSE
+        */
+
+        for(const file of files){
+
+            log(
+                'Parsing: '
+                +
+                file.name
+            );
+
+            const data =
+                await parseFit(file);
+
+            activities.push(data);
+
+            log('OK');
+        }
+
+        /*
+        SORT
+        */
+
+        activities.sort((a,b)=>{
+
+            const ta =
+                new Date(
+                    a.activity
+                    .sessions[0]
+                    .start_time
+                );
+
+            const tb =
+                new Date(
+                    b.activity
+                    .sessions[0]
+                    .start_time
+                );
+
+            return ta - tb;
+        });
+
+        /*
+        MERGE
+        */
+
+        const records =
+            mergeRecords(activities);
+
+        log(
+            'Records totali: '
+            +
+            records.length
+        );
+
+        /*
+        SETTINGS
+        */
+
+        const minSpeed =
+            parseFloat(
+                document
+                .getElementById('minSpeed')
+                .value
+            );
+
+        const minPause =
+            parseInt(
+                document
+                .getElementById('minPause')
+                .value
+            );
+
+        /*
+        PAUSES
+        */
+
+        const events =
+            detectPauses(
+                records,
+                minSpeed,
+                minPause
+            );
+
+        log(
+            'Pause trovate: '
+            +
+            events.length
+        );
+
+        /*
+        EXPORT DEBUG
+        */
+
+        let txt = '';
+
+        events.forEach(e=>{
+
+            txt +=
+                e.type
+                +
+                ' | '
+                +
+                e.timestamp
+                +
+                '\n';
+        });
+
+        downloadText(txt);
+
+        log('DONE');
+
+    }catch(err){
+
+        console.error(err);
+
+        alert(err);
+    }
 
 });
 
