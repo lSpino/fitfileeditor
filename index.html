@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TRACE CLEANER — GPX & FIT Tool</title>
+<title>TRACE CLEANER — GPX & FIT Tool 2</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -336,8 +336,19 @@ function writeGPX(pts){
 
 // ═══════════════════════════════════════════════
 // FIT WRITER — spec Garmin FIT Protocol v2
+// Timestamps sono riscritti in modo CONTINUO:
+// i buchi (soste rimosse) vengono compressi via
+// timer stop/start events così Strava capisce
+// che il tempo non deve essere contato.
 // ═══════════════════════════════════════════════
-function writeFIT(pts){
+function writeFIT(pts, threshKmh){
+  // pts sono già filtrati (soste rimosse), ma i timestamp originali
+  // hanno buchi dove c'erano le soste. Dobbiamo:
+  // 1. Rilevare i buchi temporali (gap > soglia)
+  // 2. Inserire event timer_stop prima del buco e timer_start dopo
+  // 3. Riscrivere i timestamp in modo da comprimere i buchi
+  //    → il timer FIT gira solo durante il movimento
+
   function crcByte(crc,byte){
     const T=[0x0000,0xCC01,0xD801,0x1400,0xF001,0x3C00,0x2800,0xE401,
              0xA001,0x6C00,0x7800,0xB401,0x5000,0x9C01,0x8801,0x4400];
@@ -347,79 +358,114 @@ function writeFIT(pts){
   }
   function calcCRC(arr){let c=0;for(const b of arr)c=crcByte(c,b);return c;}
 
-  // Build into a plain byte array for simplicity
   const out=[];
   function pu8(v){out.push(v&0xFF);}
   function pu16(v){out.push(v&0xFF,(v>>8)&0xFF);}
   function pu32(v){v=v>>>0;out.push(v&0xFF,(v>>8)&0xFF,(v>>16)&0xFF,(v>>24)&0xFF);}
   function ps32(v){const b=new Int32Array([v]);const u=new Uint32Array(b.buffer);pu32(u[0]);}
-
   function defMsg(lNum,gNum,fields){
     pu8(0x40|(lNum&0xF));pu8(0);pu8(0);pu16(gNum);pu8(fields.length);
     for(const[fd,sz,bt]of fields){pu8(fd);pu8(sz);pu8(bt);}
   }
   function datHdr(lNum){pu8(lNum&0xF);}
-
   function toSemi(deg){return Math.round(deg*(2**31/180.0))|0;}
-  function toFitTs(d){return Math.round(d.getTime()/1000)-FIT_EPOCH;}
 
-  const ts0=toFitTs(pts[0].time),tsEnd=toFitTs(pts[pts.length-1].time),elapsed=tsEnd-ts0;
+  // Soglia gap: gap > MAX_GAP_SEC secondi = buco da segnalare con stop/start
+  // Usiamo 10s come soglia minima di gap "reale" tra punti puliti
+  const MAX_GAP_SEC = 10;
+
+  // Calcola timestamp FIT remappati: comprimi i buchi
+  // ts_fit[i] = ts_fit[i-1] + dt_reale_tra_i-1_e_i (solo se dt < MAX_GAP_SEC)
+  //             oppure ts_fit[i-1] + 1 se c'era un buco (già segnalato con stop/start)
+  const fitTs = new Array(pts.length);
+  const isGapBefore = new Array(pts.length).fill(false); // true se prima di [i] c'era un buco
+  const gapDurations = new Array(pts.length).fill(0);    // durata del buco originale in secondi
+
+  fitTs[0] = Math.round(pts[0].time.getTime()/1000) - FIT_EPOCH;
+  for(let i=1;i<pts.length;i++){
+    const dt = (pts[i].time - pts[i-1].time)/1000;
+    if(dt > MAX_GAP_SEC){
+      // Buco: c'era una sosta qui. Comprimi a 1 secondo.
+      isGapBefore[i] = true;
+      gapDurations[i] = dt;
+      fitTs[i] = fitTs[i-1] + 1;
+    } else {
+      fitTs[i] = fitTs[i-1] + Math.max(1, Math.round(dt));
+    }
+  }
+
+  const ts0   = fitTs[0];
+  const tsEnd = fitTs[pts.length-1];
+  const movingElapsed = tsEnd - ts0; // tempo effettivo in movimento
 
   // === file_id (local 0, global 0) ===
   defMsg(0,0,[[0,1,0],[1,2,132],[2,2,132],[3,4,140],[4,4,134]]);
   datHdr(0);pu8(4);pu16(1);pu16(1328);pu32(0x00BC614E);pu32(ts0);
 
   // === event (local 1, global 21) ===
+  // timestamp(253) event(0) event_type(1) data(3)
   defMsg(1,21,[[253,4,134],[0,1,0],[1,1,0],[3,4,134]]);
-  // start event
+  // timer start iniziale
   datHdr(1);pu32(ts0);pu8(0);pu8(0);pu32(0);
 
   // === record (local 2, global 20) ===
-  // timestamp,lat,lon,distance(scale100,cm),speed(scale1000,mm/s),altitude(scale5,off500)
   defMsg(2,20,[[253,4,134],[0,4,133],[1,4,133],[5,4,134],[6,2,132],[2,2,132]]);
 
-  let totalDist=0,prev=null;
-  for(const pt of pts){
-    const ts=toFitTs(pt.time);
+  let totalDist=0,prev=null,prevFitTs=ts0;
+  for(let i=0;i<pts.length;i++){
+    const pt=pts[i];
+    const ts=fitTs[i];
+
+    // Se c'era un buco prima di questo punto: emetti stop al punto precedente, poi start qui
+    if(isGapBefore[i]){
+      // timer_stop al timestamp precedente
+      datHdr(1);pu32(fitTs[i-1]);pu8(0);pu8(4);pu32(0);
+      // timer_start al timestamp di ripresa
+      datHdr(1);pu32(ts);pu8(0);pu8(0);pu32(0);
+    }
+
     const lat=toSemi(pt.lat),lon=toSemi(pt.lon);
     const alt=Math.max(0,Math.min(65535,Math.round((pt.ele+500)*5)));
     let spd=0;
     if(prev){
-      const dt=(pt.time-prev.time)/1000;
-      if(dt>0){const d=haversine(prev.lat,prev.lon,pt.lat,pt.lon);totalDist+=d;spd=Math.min(65535,Math.round((d/dt)*1000));}
+      const dt=(ts-prevFitTs); // secondi FIT remappati
+      if(dt>0){
+        const d=haversine(prev.lat,prev.lon,pt.lat,pt.lon);
+        totalDist+=d;
+        spd=Math.min(65535,Math.round((d/dt)*1000));
+      }
     }
     datHdr(2);pu32(ts);ps32(lat);ps32(lon);pu32(Math.round(totalDist*100));pu16(spd);pu16(alt);
-    prev=pt;
+    prev=pt; prevFitTs=ts;
   }
 
-  // stop event
+  // timer_stop finale
   datHdr(1);pu32(tsEnd);pu8(0);pu8(4);pu32(0);
 
   // === lap (local 3, global 19) ===
   defMsg(3,19,[[253,4,134],[25,4,134],[21,4,134],[23,4,134],[254,2,132]]);
-  datHdr(3);pu32(tsEnd);pu32(ts0);pu32(elapsed*1000);pu32(Math.round(totalDist*100));pu16(0);
+  datHdr(3);pu32(tsEnd);pu32(ts0);pu32(movingElapsed*1000);pu32(Math.round(totalDist*100));pu16(0);
 
   // === session (local 4, global 18) ===
   defMsg(4,18,[[253,4,134],[25,4,134],[21,4,134],[23,4,134],[5,1,0],[6,1,0],[254,2,132]]);
-  datHdr(4);pu32(tsEnd);pu32(ts0);pu32(elapsed*1000);pu32(Math.round(totalDist*100));pu8(2);pu8(0);pu16(0);
+  datHdr(4);pu32(tsEnd);pu32(ts0);pu32(movingElapsed*1000);pu32(Math.round(totalDist*100));pu8(2);pu8(0);pu16(0);
 
   // === activity (local 5, global 34) ===
   defMsg(5,34,[[253,4,134],[1,4,134],[5,1,0],[4,4,134]]);
-  datHdr(5);pu32(tsEnd);pu32(tsEnd);pu8(1);pu32(elapsed*1000);
+  datHdr(5);pu32(tsEnd);pu32(tsEnd);pu8(1);pu32(movingElapsed*1000);
 
   // Body CRC
   const bodyCRC=calcCRC(out);
   out.push(bodyCRC&0xFF,(bodyCRC>>8)&0xFF);
 
-  // Header (14 bytes) — data_size = body without trailing 2 CRC bytes
+  // Header
   const dataSize=out.length-2;
   const hdr=[14,0x10,2132&0xFF,(2132>>8)&0xFF,
     dataSize&0xFF,(dataSize>>8)&0xFF,(dataSize>>16)&0xFF,(dataSize>>24)&0xFF,
-    0x2E,0x46,0x49,0x54]; // ".FIT"
+    0x2E,0x46,0x49,0x54];
   const hdrCRC=calcCRC(hdr);
   hdr.push(hdrCRC&0xFF,(hdrCRC>>8)&0xFF);
 
-  // Combine
   const final=new Uint8Array(hdr.length+out.length);
   final.set(hdr,0);final.set(out,hdr.length);
   return final.buffer;
@@ -527,7 +573,7 @@ btnProcess.addEventListener('click',async()=>{
     const base=loadedFiles.length===1?loadedFiles[0].name.replace(/\.(gpx|fit)$/i,''):'merged';
     let blob,filename;
     if(outputFmt==='gpx'){blob=new Blob([writeGPX(pts)],{type:'application/gpx+xml'});filename=base+'_cleaned.gpx';}
-    else{blob=new Blob([writeFIT(pts)],{type:'application/octet-stream'});filename=base+'_cleaned.fit';}
+    else{blob=new Blob([writeFIT(pts,thresh)],{type:'application/octet-stream'});filename=base+'_cleaned.fit';}
     btnDownload.href=URL.createObjectURL(blob);
     btnDownload.download=filename;
     setProgress(100,'fatto!');await tick();
