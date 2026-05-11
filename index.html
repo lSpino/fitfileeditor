@@ -3,936 +3,541 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GPX / FIT Cleaner — rimuovi le soste</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@300;600;800&display=swap" rel="stylesheet">
+<title>TRACE CLEANER — GPX & FIT Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #0d0d0f;
-    --surface: #16161a;
-    --border: #2a2a30;
-    --accent: #e8ff47;
-    --accent2: #47c8ff;
-    --text: #e8e8ec;
-    --muted: #6b6b78;
-    --danger: #ff4747;
-    --success: #47ffb2;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'DM Mono', monospace;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 0 1rem 4rem;
-    overflow-x: hidden;
-  }
-
-  /* Grain overlay */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.5;
-  }
-
-  header {
-    width: 100%;
-    max-width: 780px;
-    padding: 3.5rem 0 2rem;
-    position: relative;
-    z-index: 1;
-  }
-
-  .badge {
-    display: inline-block;
-    font-size: 0.65rem;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--accent);
-    border: 1px solid var(--accent);
-    padding: 0.2em 0.6em;
-    margin-bottom: 1rem;
-  }
-
-  h1 {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: clamp(3rem, 8vw, 5.5rem);
-    font-weight: 800;
-    line-height: 0.95;
-    letter-spacing: -0.01em;
-    margin-bottom: 0.5rem;
-  }
-
-  h1 span { color: var(--accent); }
-
-  .subtitle {
-    color: var(--muted);
-    font-size: 0.78rem;
-    letter-spacing: 0.05em;
-    margin-top: 0.8rem;
-  }
-
-  main {
-    width: 100%;
-    max-width: 780px;
-    position: relative;
-    z-index: 1;
-  }
-
-  /* Drop zone */
-  .dropzone {
-    border: 1px dashed var(--border);
-    border-radius: 2px;
-    padding: 3.5rem 2rem;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color 0.2s, background 0.2s;
-    position: relative;
-    background: var(--surface);
-    margin-bottom: 1.5rem;
-  }
-
-  .dropzone:hover, .dropzone.drag-over {
-    border-color: var(--accent);
-    background: rgba(232, 255, 71, 0.03);
-  }
-
-  .dropzone input[type=file] {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    cursor: pointer;
-    width: 100%;
-    height: 100%;
-  }
-
-  .drop-icon {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
-    display: block;
-  }
-
-  .drop-label {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 1.4rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    color: var(--text);
-    display: block;
-    margin-bottom: 0.4rem;
-  }
-
-  .drop-sub {
-    color: var(--muted);
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-  }
-
-  /* Settings */
-  .settings {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-
-  @media (max-width: 500px) { .settings { grid-template-columns: 1fr; } }
-
-  .field {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: 1rem 1.2rem;
-  }
-
-  .field label {
-    display: block;
-    font-size: 0.65rem;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 0.5rem;
-  }
-
-  .field-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .field input[type=range] {
-    -webkit-appearance: none;
-    width: 100%;
-    height: 2px;
-    background: var(--border);
-    outline: none;
-    cursor: pointer;
-  }
-
-  .field input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
-    background: var(--accent);
-    border-radius: 0;
-    cursor: pointer;
-  }
-
-  .field-val {
-    font-size: 1.1rem;
-    font-weight: 500;
-    color: var(--accent);
-    min-width: 3.5rem;
-    text-align: right;
-  }
-
-  /* Format toggle */
-  .format-toggle {
-    display: flex;
-    gap: 0;
-    width: 100%;
-  }
-
-  .fmt-btn {
-    flex: 1;
-    padding: 0.5rem;
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    font-family: 'DM Mono', monospace;
-    font-size: 0.75rem;
-    letter-spacing: 0.1em;
-    cursor: pointer;
-    transition: all 0.15s;
-    text-transform: uppercase;
-  }
-
-  .fmt-btn:not(:first-child) { border-left: none; }
-
-  .fmt-btn.active {
-    background: var(--accent);
-    color: var(--bg);
-    border-color: var(--accent);
-    font-weight: 500;
-  }
-
-  /* Process button */
-  .btn-process {
-    width: 100%;
-    padding: 1.2rem;
-    background: var(--accent);
-    color: var(--bg);
-    border: none;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 1.4rem;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: opacity 0.15s, transform 0.1s;
-    margin-bottom: 1.5rem;
-  }
-
-  .btn-process:hover { opacity: 0.9; transform: translateY(-1px); }
-  .btn-process:active { transform: translateY(0); }
-  .btn-process:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
-
-  /* Stats panel */
-  .stats {
-    display: none;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    animation: fadeIn 0.3s ease;
-  }
-
-  .stats.visible { display: block; }
-
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.2rem;
-  }
-
-  @media (max-width: 500px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
-
-  .stat-item label {
-    display: block;
-    font-size: 0.6rem;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 0.3rem;
-  }
-
-  .stat-item .val {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 1.8rem;
-    font-weight: 600;
-    line-height: 1;
-  }
-
-  .val.good { color: var(--success); }
-  .val.warn { color: var(--accent); }
-  .val.info { color: var(--accent2); }
-
-  .stat-item .unit {
-    font-size: 0.65rem;
-    color: var(--muted);
-    margin-left: 0.2em;
-  }
-
-  .progress-bar {
-    height: 3px;
-    background: var(--border);
-    margin-bottom: 0.8rem;
-    overflow: hidden;
-  }
-
-  .progress-fill {
-    height: 100%;
-    background: var(--accent);
-    transition: width 0.4s ease;
-  }
-
-  .stats-log {
-    font-size: 0.7rem;
-    color: var(--muted);
-    line-height: 1.8;
-  }
-
-  .stats-log span { color: var(--accent); }
-
-  /* Download button */
-  .btn-download {
-    display: none;
-    width: 100%;
-    padding: 1rem;
-    background: none;
-    border: 1px solid var(--success);
-    color: var(--success);
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 1.2rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.15s;
-    text-align: center;
-    text-decoration: none;
-  }
-
-  .btn-download.visible { display: block; }
-  .btn-download:hover { background: var(--success); color: var(--bg); }
-
-  /* Error */
-  .error-msg {
-    display: none;
-    padding: 1rem 1.2rem;
-    border: 1px solid var(--danger);
-    color: var(--danger);
-    font-size: 0.75rem;
-    margin-bottom: 1rem;
-    animation: fadeIn 0.2s ease;
-  }
-  .error-msg.visible { display: block; }
-
-  footer {
-    margin-top: 4rem;
-    color: var(--muted);
-    font-size: 0.65rem;
-    letter-spacing: 0.1em;
-    text-align: center;
-    z-index: 1;
-    position: relative;
-  }
-
-  /* File name display */
-  .file-name {
-    display: none;
-    font-size: 0.72rem;
-    color: var(--accent2);
-    margin-bottom: 1rem;
-    padding: 0.6rem 1rem;
-    background: rgba(71, 200, 255, 0.05);
-    border: 1px solid rgba(71, 200, 255, 0.2);
-  }
-  .file-name.visible { display: block; }
+:root {
+  --bg: #0a0a0a;
+  --panel: #111;
+  --border: #222;
+  --accent: #00ff88;
+  --accent2: #ff6b00;
+  --text: #e8e8e8;
+  --muted: #555;
+  --danger: #ff3333;
+  --info: #33aaff;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:40px 40px;opacity:.4;pointer-events:none;z-index:0;}
+.wrap{max-width:860px;margin:0 auto;padding:2rem 1.5rem 6rem;position:relative;z-index:1;}
+header{padding:3rem 0 2.5rem;border-bottom:1px solid var(--border);margin-bottom:2rem;}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:clamp(3.5rem,10vw,7rem);line-height:.9;letter-spacing:.02em;}
+.logo em{color:var(--accent);font-style:normal;}
+.tagline{margin-top:.8rem;font-size:.65rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);}
+.tagline span{color:var(--accent2);}
+.drop-area{border:1px dashed var(--muted);padding:3rem 2rem;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:var(--panel);margin-bottom:1.5rem;}
+.drop-area:hover,.drop-area.over{border-color:var(--accent);background:rgba(0,255,136,.03);}
+.drop-area input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.drop-icon{font-size:2rem;margin-bottom:.8rem;}
+.drop-title{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:.1em;margin-bottom:.3rem;}
+.drop-sub{font-size:.62rem;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;}
+.file-list{display:flex;flex-direction:column;gap:.5rem;margin-bottom:1.5rem;}
+.file-item{display:flex;align-items:center;gap:.8rem;padding:.6rem 1rem;background:var(--panel);border:1px solid var(--border);font-size:.7rem;animation:slideIn .2s ease;}
+@keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+.file-item .fi-name{flex:1;color:var(--info);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.file-item .fi-info{color:var(--muted);white-space:nowrap;}
+.file-item .fi-rm{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;line-height:1;padding:0 .2rem;transition:color .15s;}
+.file-item .fi-rm:hover{color:var(--danger);}
+.section-label{font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:.8rem;}
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;}
+@media(max-width:500px){.settings-grid{grid-template-columns:1fr;}}
+.field{background:var(--panel);border:1px solid var(--border);padding:1rem 1.2rem;}
+.field label{display:block;font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.6rem;}
+.field input[type=range]{-webkit-appearance:none;width:100%;height:2px;background:var(--border);outline:none;cursor:pointer;}
+.field input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;background:var(--accent);cursor:pointer;}
+.field-row{display:flex;align-items:center;gap:.8rem;}
+.field-val{font-size:1.2rem;font-weight:700;color:var(--accent);min-width:3.5rem;text-align:right;}
+.toggle-row{display:flex;gap:0;width:100%;}
+.tog-btn{flex:1;padding:.6rem;background:none;border:1px solid var(--border);color:var(--muted);font-family:'Space Mono',monospace;font-size:.65rem;letter-spacing:.1em;cursor:pointer;transition:all .15s;text-transform:uppercase;}
+.tog-btn:not(:first-child){border-left:none;}
+.tog-btn.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700;}
+.btn-process{width:100%;padding:1.3rem;background:var(--accent);color:#000;border:none;font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:.15em;cursor:pointer;transition:all .15s;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:center;gap:.8rem;}
+.btn-process:hover{opacity:.9;transform:translateY(-1px);}
+.btn-process:active{transform:none;}
+.btn-process:disabled{opacity:.25;cursor:not-allowed;transform:none;}
+.progress-wrap{margin-bottom:1.5rem;display:none;}
+.progress-wrap.visible{display:block;}
+.progress-label{font-size:.62rem;letter-spacing:.15em;color:var(--muted);margin-bottom:.5rem;}
+.progress-bar{height:2px;background:var(--border);}
+.progress-fill{height:100%;background:var(--accent);transition:width .3s ease;width:0%;}
+.stats-panel{background:var(--panel);border:1px solid var(--border);padding:1.5rem;margin-bottom:1.5rem;display:none;}
+.stats-panel.visible{display:block;animation:fadeIn .3s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1rem;}
+@media(max-width:500px){.stats-grid{grid-template-columns:repeat(2,1fr);}}
+.stat label{display:block;font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem;}
+.stat .val{font-family:'Bebas Neue',sans-serif;font-size:2rem;line-height:1;}
+.val.green{color:var(--accent);}
+.val.orange{color:var(--accent2);}
+.val.blue{color:var(--info);}
+.stat .unit{font-size:.6rem;color:var(--muted);margin-left:.2em;}
+.stats-log{font-size:.65rem;color:var(--muted);line-height:2;border-top:1px solid var(--border);padding-top:.8rem;margin-top:.5rem;}
+.stats-log b{color:var(--text);}
+.merge-info{font-size:.65rem;color:var(--accent2);margin-top:.8rem;line-height:2;border-top:1px solid var(--border);padding-top:.8rem;}
+.error-box{display:none;padding:1rem;border:1px solid var(--danger);color:var(--danger);font-size:.7rem;margin-bottom:1rem;}
+.error-box.visible{display:block;}
+.btn-download{display:none;width:100%;padding:1.1rem;background:none;border:1px solid var(--accent);color:var(--accent);font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:.12em;cursor:pointer;transition:all .15s;text-align:center;text-decoration:none;}
+.btn-download.visible{display:block;}
+.btn-download:hover{background:var(--accent);color:#000;}
+footer{margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border);font-size:.6rem;letter-spacing:.1em;color:var(--muted);line-height:2;}
+footer span{color:var(--accent2);}
 </style>
 </head>
 <body>
-
+<div class="wrap">
 <header>
-  <span class="badge">GPX / FIT Tool</span>
-  <h1>STOP<br><span>REMOVER</span></h1>
-  <p class="subtitle">// rimuovi le soste dal tracciato — velocità media reale</p>
+  <div class="logo">TRACE<br><em>CLEANER</em></div>
+  <p class="tagline">GPX &amp; FIT processor — <span>rimuovi soste · unisci tracce · esporta FIT/GPX</span></p>
 </header>
 
-<main>
-  <div class="dropzone" id="dropzone">
-    <input type="file" id="fileInput" accept=".gpx,.fit">
-    <span class="drop-icon">📂</span>
-    <span class="drop-label">Trascina qui il file</span>
-    <span class="drop-sub">GPX o FIT — max 50 MB</span>
-  </div>
+<div class="drop-area" id="dropArea">
+  <input type="file" id="fileInput" accept=".gpx,.fit" multiple>
+  <div class="drop-icon">📂</div>
+  <div class="drop-title">Trascina i file qui</div>
+  <div class="drop-sub">GPX o FIT — anche più file insieme</div>
+</div>
 
-  <div class="file-name" id="fileName"></div>
+<div class="file-list" id="fileList"></div>
 
-  <div class="settings">
-    <div class="field">
-      <label>Soglia sosta (km/h)</label>
-      <div class="field-row">
-        <input type="range" id="threshold" min="0.5" max="10" step="0.5" value="2">
-        <span class="field-val" id="thresholdVal">2.0</span>
-      </div>
-    </div>
-    <div class="field">
-      <label>Formato output</label>
-      <div class="format-toggle">
-        <button class="fmt-btn active" data-fmt="gpx">GPX</button>
-        <button class="fmt-btn" data-fmt="fit">FIT</button>
-      </div>
+<div class="section-label">Impostazioni</div>
+<div class="settings-grid">
+  <div class="field">
+    <label>Soglia sosta (km/h)</label>
+    <div class="field-row">
+      <input type="range" id="threshold" min="0.5" max="10" step="0.5" value="2">
+      <span class="field-val" id="threshVal">2.0</span>
     </div>
   </div>
-
-  <div class="error-msg" id="errorMsg"></div>
-
-  <button class="btn-process" id="btnProcess" disabled>
-    ▶ PROCESSA FILE
-  </button>
-
-  <div class="stats" id="statsPanel">
-    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
-    <div class="stats-grid">
-      <div class="stat-item">
-        <label>Distanza</label>
-        <div class="val info" id="statDist">—</div>
-      </div>
-      <div class="stat-item">
-        <label>Vel. media (con soste)</label>
-        <div class="val warn" id="statVelOld">—</div>
-      </div>
-      <div class="stat-item">
-        <label>Vel. media (movimento)</label>
-        <div class="val good" id="statVelNew">—</div>
-      </div>
-      <div class="stat-item">
-        <label>Tempo totale</label>
-        <div class="val info" id="statTimeTotal">—</div>
-      </div>
-      <div class="stat-item">
-        <label>Tempo in sosta</label>
-        <div class="val warn" id="statTimeStopped">—</div>
-      </div>
-      <div class="stat-item">
-        <label>Punti rimossi</label>
-        <div class="val good" id="statRemoved">—</div>
-      </div>
+  <div class="field">
+    <label>Formato output</label>
+    <div class="toggle-row">
+      <button class="tog-btn" data-fmt="gpx">GPX</button>
+      <button class="tog-btn active" data-fmt="fit">FIT</button>
     </div>
-    <div class="stats-log" id="statsLog"></div>
   </div>
+</div>
 
-  <a class="btn-download" id="btnDownload" download>
-    ⬇ SCARICA FILE PULITO
-  </a>
-</main>
+<div class="error-box" id="errorBox"></div>
+
+<button class="btn-process" id="btnProcess" disabled>▶ PROCESSA</button>
+
+<div class="progress-wrap" id="progressWrap">
+  <div class="progress-label" id="progressLabel">elaborazione...</div>
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<div class="stats-panel" id="statsPanel">
+  <div class="stats-grid">
+    <div class="stat"><label>Distanza totale</label><div class="val blue" id="sDist">—</div></div>
+    <div class="stat"><label>Vel. media con soste</label><div class="val orange" id="sVelOld">—</div></div>
+    <div class="stat"><label>Vel. media movimento</label><div class="val green" id="sVelNew">—</div></div>
+    <div class="stat"><label>Durata totale</label><div class="val blue" id="sTimeTotal">—</div></div>
+    <div class="stat"><label>Tempo in sosta</label><div class="val orange" id="sTimeStopped">—</div></div>
+    <div class="stat"><label>Punti rimossi</label><div class="val green" id="sRemoved">—</div></div>
+  </div>
+  <div class="stats-log" id="statsLog"></div>
+  <div class="merge-info" id="mergeInfo"></div>
+</div>
+
+<a class="btn-download" id="btnDownload" download>⬇ SCARICA FILE</a>
 
 <footer>
-  <p>tutto gira nel browser — nessun file viene caricato su server</p>
+  <div>tutto gira nel browser — <span>nessun dato viene inviato a server</span></div>
+  <div>supporta .gpx e .fit — merge automatico cronologico — rimozione soste</div>
 </footer>
+</div>
 
 <script>
-// ─── Utilities ───────────────────────────────────────────────
-function haversine(lat1, lon1, lat2, lon2) {
-  const R = 6371000;
-  const p1 = lat1 * Math.PI/180, p2 = lat2 * Math.PI/180;
-  const dp = (lat2-lat1)*Math.PI/180, dl = (lon2-lon1)*Math.PI/180;
-  const a = Math.sin(dp/2)**2 + Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+// ═══════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════
+const FIT_EPOCH = 631065600;
+
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371000,toR=Math.PI/180;
+  const p1=lat1*toR,p2=lat2*toR,dp=(lat2-lat1)*toR,dl=(lon2-lon1)*toR;
+  const a=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
+function fmtTime(sec){const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60);return`${h}h ${m}min`;}
+function fmtDate(d){return d.toISOString().replace('T',' ').substring(0,16);}
+function tick(){return new Promise(r=>setTimeout(r,20));}
 
-function fmtTime(sec) {
-  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60);
-  return `${h}h ${m}min`;
-}
-
-// ─── GPX Parser ───────────────────────────────────────────────
-function parseGPX(text) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(text, 'text/xml');
-  const ns = 'http://www.topografix.com/GPX/1/1';
-
-  const getEl = (el, tag) => el.getElementsByTagNameNS(ns, tag)[0]
-                           || el.getElementsByTagName(tag)[0];
-
-  const pts = [];
-  const trkpts = doc.getElementsByTagNameNS(ns, 'trkpt').length > 0
-    ? doc.getElementsByTagNameNS(ns, 'trkpt')
-    : doc.getElementsByTagName('trkpt');
-
-  for (const pt of trkpts) {
-    const timeEl = getEl(pt, 'time');
-    const eleEl  = getEl(pt, 'ele');
-    if (!timeEl) continue;
-    pts.push({
-      lat: parseFloat(pt.getAttribute('lat')),
-      lon: parseFloat(pt.getAttribute('lon')),
-      ele: eleEl ? parseFloat(eleEl.textContent) : 0,
-      time: new Date(timeEl.textContent),
-      _el: pt,
-    });
+// ═══════════════════════════════════════════════
+// GPX PARSER
+// ═══════════════════════════════════════════════
+function parseGPX(text,filename){
+  const doc=new DOMParser().parseFromString(text,'text/xml');
+  const ns='http://www.topografix.com/GPX/1/1';
+  const gA=(tag)=>{let e=doc.getElementsByTagNameNS(ns,tag);return e.length?e:doc.getElementsByTagName(tag);};
+  const g1=(el,tag)=>el.getElementsByTagNameNS(ns,tag)[0]||el.getElementsByTagName(tag)[0];
+  const pts=[];
+  for(const pt of gA('trkpt')){
+    const te=g1(pt,'time'),ee=g1(pt,'ele');
+    if(!te)continue;
+    const t=new Date(te.textContent.trim());
+    if(isNaN(t))continue;
+    pts.push({lat:parseFloat(pt.getAttribute('lat')),lon:parseFloat(pt.getAttribute('lon')),ele:ee?parseFloat(ee.textContent):0,time:t});
   }
-  return { doc, pts, type: 'gpx' };
+  return{pts,filename,format:'gpx'};
 }
 
-// ─── FIT Parser (minimal — timestamps + position) ─────────────
-const FIT_EPOCH = 631065600000; // ms
-
-function parseFIT(buffer) {
-  const data = new DataView(buffer);
-  const bytes = new Uint8Array(buffer);
-
-  // Scan for record messages (global mesg 20) via definition messages
-  // We do a simplified scan: look for all uint32 timestamps and sint32 lat/lon pairs
-  const pts = [];
-  const definitions = {};
-
-  let i = 14; // skip header
-  const end = bytes.length - 2;
-
-  while (i < end) {
-    const header = bytes[i];
-    const isCompressed = (header & 0x80) !== 0;
-
-    if (isCompressed) { i++; continue; }
-
-    const isDef = (header & 0x40) !== 0;
-    const localMsgNum = header & 0x0F;
-
-    if (isDef) {
-      i++; // reserved
-      const arch = bytes[i++]; // 0=little, 1=big
-      const globalMsgNum = arch === 0
-        ? (bytes[i] | (bytes[i+1] << 8)) : (bytes[i+1] | (bytes[i] << 8));
-      i += 2;
-      const numFields = bytes[i++];
-      const fields = [];
-      for (let f = 0; f < numFields; f++) {
-        const fNum  = bytes[i++];
-        const fSize = bytes[i++];
-        const fType = bytes[i++];
-        fields.push({ num: fNum, size: fSize, type: fType });
-      }
-      // Check for dev fields
-      const hasDevFields = (header & 0x20) !== 0;
-      if (hasDevFields) {
-        const numDev = bytes[i++];
-        for (let d = 0; d < numDev; d++) { i += 3; }
-      }
-      definitions[localMsgNum] = { globalMsgNum, arch, fields };
-    } else {
-      i++;
-      const def = definitions[localMsgNum];
-      if (!def) { i++; continue; }
-
-      const le = def.arch === 0;
-      let offset = i;
-      let ts = null, lat = null, lon = null, ele = null, spd = null;
-
-      for (const field of def.fields) {
-        if (def.globalMsgNum === 20) { // record
-          const read32s = () => {
-            const v = le
-              ? (bytes[offset] | bytes[offset+1]<<8 | bytes[offset+2]<<16 | bytes[offset+3]<<24)
-              : (bytes[offset]<<24 | bytes[offset+1]<<16 | bytes[offset+2]<<8 | bytes[offset+3]);
-            return v;
-          };
-          const read32u = () => read32s() >>> 0;
-          const read16u = () => le
-            ? (bytes[offset] | bytes[offset+1]<<8)
-            : (bytes[offset]<<8 | bytes[offset+1]);
-
-          if (field.num === 253) ts  = read32u(); // timestamp
-          if (field.num === 0)   lat = read32s(); // position_lat
-          if (field.num === 1)   lon = read32s(); // position_long
-          if (field.num === 2)   ele = read16u(); // altitude
-          if (field.num === 6)   spd = read16u(); // speed
+// ═══════════════════════════════════════════════
+// FIT PARSER
+// ═══════════════════════════════════════════════
+function parseFIT(buffer,filename){
+  const bytes=new Uint8Array(buffer),view=new DataView(buffer),pts=[],INV32=0x7FFFFFFF;
+  if(bytes[8]!==0x2E||bytes[9]!==0x46||bytes[10]!==0x49||bytes[11]!==0x54)throw new Error('FIT: magic .FIT non trovato');
+  const defs={};
+  let i=14;
+  const end=bytes.length-2;
+  while(i<end){
+    if(i>=bytes.length)break;
+    const hdr=bytes[i];
+    const isComp=(hdr&0x80)!==0;
+    if(isComp){
+      const lNum=(hdr>>5)&0x03;i++;
+      const def=defs[lNum];if(!def)continue;
+      let off=i,lat=null,lon=null,ele=null,ts=null;
+      for(const f of def.fields){
+        if(off+f.size>bytes.length)break;
+        if(def.gn===20){
+          if(f.num===253&&f.size===4)ts=view.getUint32(off,def.le);
+          if(f.num===0&&f.size===4)lat=view.getInt32(off,def.le);
+          if(f.num===1&&f.size===4)lon=view.getInt32(off,def.le);
+          if(f.num===2&&f.size===2)ele=view.getUint16(off,def.le);
         }
-        offset += field.size;
+        off+=f.size;
       }
-
-      if (def.globalMsgNum === 20 && ts !== null && lat !== null && lon !== null
-          && lat !== 0x7FFFFFFF && lon !== 0x7FFFFFFF) {
-        pts.push({
-          lat: lat * (180.0 / 2**31),
-          lon: lon * (180.0 / 2**31),
-          ele: ele !== null ? (ele / 5.0) - 500.0 : 0,
-          time: new Date(ts * 1000 + FIT_EPOCH),
-          spd: spd !== null ? spd / 1000 : null,
-        });
+      if(def.gn===20&&ts!==null&&lat!==null&&lon!==null&&lat!==INV32&&lat!==(-INV32-1)&&lon!==INV32)
+        pts.push({lat:lat*(180/2**31),lon:lon*(180/2**31),ele:ele!==null?ele/5-500:0,time:new Date(ts*1000+FIT_EPOCH*1000)});
+      i=off;continue;
+    }
+    const isDef=(hdr&0x40)!==0,hasDevDef=(hdr&0x20)!==0,lNum=hdr&0x0F;
+    i++;
+    if(isDef){
+      i++;
+      const le=bytes[i++]===0;
+      const gn=le?(bytes[i]|bytes[i+1]<<8):(bytes[i]<<8|bytes[i+1]);i+=2;
+      const nf=bytes[i++];const fields=[];
+      for(let f=0;f<nf;f++){fields.push({num:bytes[i],size:bytes[i+1],type:bytes[i+2]});i+=3;}
+      if(hasDevDef){const nd=bytes[i++];for(let d=0;d<nd;d++)i+=3;}
+      defs[lNum]={gn,le,fields};
+    }else{
+      const def=defs[lNum];if(!def){i++;continue;}
+      let off=i,ts=null,lat=null,lon=null,ele=null;
+      for(const f of def.fields){
+        if(off+f.size>bytes.length)break;
+        if(def.gn===20){
+          if(f.num===253&&f.size===4)ts=view.getUint32(off,def.le);
+          if(f.num===0&&f.size===4)lat=view.getInt32(off,def.le);
+          if(f.num===1&&f.size===4)lon=view.getInt32(off,def.le);
+          if(f.num===2&&f.size===2)ele=view.getUint16(off,def.le);
+        }
+        off+=f.size;
       }
+      if(def.gn===20&&ts!==null&&lat!==null&&lon!==null&&lat!==INV32&&lat!==(-INV32-1)&&lon!==INV32)
+        pts.push({lat:lat*(180/2**31),lon:lon*(180/2**31),ele:ele!==null?ele/5-500:0,time:new Date(ts*1000+FIT_EPOCH*1000)});
+      i=off;
+    }
+  }
+  return{pts,filename,format:'fit'};
+}
 
-      i = offset;
+// ═══════════════════════════════════════════════
+// MERGE + STOP REMOVAL
+// ═══════════════════════════════════════════════
+function mergeAndClean(tracks,threshKmh){
+  tracks.forEach(t=>t.pts.sort((a,b)=>a.time-b.time));
+  tracks.sort((a,b)=>a.pts[0].time-b.pts[0].time);
+  const log=[];
+  let all=[];
+
+  if(tracks.length===1){
+    all=[...tracks[0].pts];
+    log.push(`📍 ${tracks[0].filename}: ${all.length} punti`);
+  }else{
+    all=[...tracks[0].pts];
+    log.push(`📍 ${tracks[0].filename}: ${tracks[0].pts.length} pt · ${fmtDate(tracks[0].pts[0].time)}`);
+    for(let ti=1;ti<tracks.length;ti++){
+      const tr=tracks[ti];
+      const tS=tr.pts[0].time,tE=tr.pts[tr.pts.length-1].time;
+      const lastT=all[all.length-1].time;
+      let inserted=false;
+      if(tS<=lastT){
+        const oi=all.findIndex(p=>p.time>=tS);
+        if(oi>0){
+          let bestCut=oi,bestD=Infinity;
+          const sf=Math.max(0,oi-50),st=Math.min(all.length-1,oi+50);
+          for(let j=sf;j<=st;j++){
+            const d=haversine(all[j].lat,all[j].lon,tr.pts[0].lat,tr.pts[0].lon);
+            if(d<bestD){bestD=d;bestCut=j;}
+          }
+          let bestEnt=0,bestED=Infinity;
+          for(let j=0;j<Math.min(tr.pts.length,100);j++){
+            const d=haversine(tr.pts[j].lat,tr.pts[j].lon,all[bestCut].lat,all[bestCut].lon);
+            if(d<bestED){bestED=d;bestEnt=j;}
+          }
+          all=all.slice(0,bestCut).concat(tr.pts.slice(bestEnt));
+          log.push(`🔗 ${tr.filename}: unito (overlap, giunzione ~${Math.round(bestD)}m)`);
+          inserted=true;
+        }
+      }
+      if(!inserted){
+        const gapMin=Math.round((tS-lastT)/60000);
+        all=all.concat(tr.pts);
+        log.push(`➕ ${tr.filename}: ${tr.pts.length} pt · aggiunto dopo (gap ${gapMin}min)`);
+      }
     }
   }
 
-  return { pts, type: 'fit' };
-}
-
-// ─── Remove stops ─────────────────────────────────────────────
-function removeStops(pts, thresholdKmh) {
-  if (pts.length < 2) return { kept: pts, removed: 0, movingTime: 0, stoppedTime: 0, totalDist: 0 };
-
-  const keepFlags = new Array(pts.length).fill(true);
-  let movingTime = 0, stoppedTime = 0, totalDist = 0;
-
-  for (let i = 1; i < pts.length; i++) {
-    const dt = (pts[i].time - pts[i-1].time) / 1000;
-    if (dt <= 0) { keepFlags[i] = false; continue; }
-    const d = haversine(pts[i-1].lat, pts[i-1].lon, pts[i].lat, pts[i].lon);
-    const kmh = (d / dt) * 3.6;
-    totalDist += d;
-    if (kmh < thresholdKmh) {
-      stoppedTime += dt;
-      if (i !== pts.length - 1) keepFlags[i] = false;
-    } else {
-      movingTime += dt;
-    }
+  // Remove stops
+  const orig=all.length;
+  const keep=new Array(all.length).fill(true);
+  let movT=0,stopT=0,dist=0;
+  for(let i=1;i<all.length;i++){
+    const dt=(all[i].time-all[i-1].time)/1000;
+    if(dt<=0||dt>3600){keep[i]=false;continue;}
+    const d=haversine(all[i-1].lat,all[i-1].lon,all[i].lat,all[i].lon);
+    const kmh=(d/dt)*3.6;
+    dist+=d;
+    if(kmh<threshKmh){stopT+=dt;if(i!==all.length-1)keep[i]=false;}
+    else movT+=dt;
   }
-
-  const kept = pts.filter((_, i) => keepFlags[i]);
-  const removed = pts.length - kept.length;
-  return { kept, removed, movingTime, stoppedTime, totalDist };
+  const pts=all.filter((_,i)=>keep[i]);
+  return{pts,removed:orig-pts.length,origCount:orig,movingTime:movT,stoppedTime:stopT,totalDist:dist,mergeLog:log};
 }
 
-// ─── GPX Writer ───────────────────────────────────────────────
-function writeGPX(pts, originalDoc) {
-  const ns = 'http://www.topografix.com/GPX/1/1';
-  const doc = document.implementation.createDocument(ns, 'gpx', null);
-  const gpx = doc.documentElement;
-  gpx.setAttribute('version', '1.1');
-  gpx.setAttribute('creator', 'StopRemover');
-  gpx.setAttribute('xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance');
-
-  const trk = doc.createElementNS(ns, 'trk');
-  const name = doc.createElementNS(ns, 'name');
-  name.textContent = 'Activity (cleaned)';
-  trk.appendChild(name);
-  const type = doc.createElementNS(ns, 'type');
-  type.textContent = 'cycling';
-  trk.appendChild(type);
-
-  const seg = doc.createElementNS(ns, 'trkseg');
-
-  for (const pt of pts) {
-    const trkpt = doc.createElementNS(ns, 'trkpt');
-    trkpt.setAttribute('lat', pt.lat.toFixed(10));
-    trkpt.setAttribute('lon', pt.lon.toFixed(10));
-
-    const ele = doc.createElementNS(ns, 'ele');
-    ele.textContent = pt.ele.toFixed(2);
-    trkpt.appendChild(ele);
-
-    const time = doc.createElementNS(ns, 'time');
-    time.textContent = pt.time.toISOString();
-    trkpt.appendChild(time);
-
-    seg.appendChild(trkpt);
+// ═══════════════════════════════════════════════
+// GPX WRITER
+// ═══════════════════════════════════════════════
+function writeGPX(pts){
+  const ns='http://www.topografix.com/GPX/1/1';
+  const doc=document.implementation.createDocument(ns,'gpx',null);
+  const gpx=doc.documentElement;
+  gpx.setAttribute('version','1.1');gpx.setAttribute('creator','TraceCleaner');
+  const trk=doc.createElementNS(ns,'trk');
+  const nm=doc.createElementNS(ns,'name');nm.textContent='Activity (cleaned)';trk.appendChild(nm);
+  const ty=doc.createElementNS(ns,'type');ty.textContent='cycling';trk.appendChild(ty);
+  const seg=doc.createElementNS(ns,'trkseg');
+  for(const pt of pts){
+    const tp=doc.createElementNS(ns,'trkpt');
+    tp.setAttribute('lat',pt.lat.toFixed(10));tp.setAttribute('lon',pt.lon.toFixed(10));
+    const el=doc.createElementNS(ns,'ele');el.textContent=pt.ele.toFixed(2);tp.appendChild(el);
+    const ti=doc.createElementNS(ns,'time');ti.textContent=pt.time.toISOString();tp.appendChild(ti);
+    seg.appendChild(tp);
   }
-
-  trk.appendChild(seg);
-  gpx.appendChild(trk);
-
-  return '<?xml version="1.0" encoding="UTF-8"?>\n' +
-    new XMLSerializer().serializeToString(doc);
+  trk.appendChild(seg);gpx.appendChild(trk);
+  return'<?xml version="1.0" encoding="UTF-8"?>\n'+new XMLSerializer().serializeToString(doc);
 }
 
-// ─── FIT Writer ───────────────────────────────────────────────
-function writeFIT(pts) {
-  const FIT_EPOCH_S = 631065600;
-
-  function toFitTs(d) { return Math.round(d.getTime()/1000) - FIT_EPOCH_S; }
-  function toSemi(deg) { return Math.round(deg * (2**31 / 180.0)); }
-
-  function crcUpdate(crc, byte) {
-    const table = [0x0000,0xCC01,0xD801,0x1400,0xF001,0x3C00,0x2800,0xE401,
-                   0xA001,0x6C00,0x7800,0xB401,0x5000,0x9C01,0x8801,0x4400];
-    let tmp = table[crc & 0xF]; crc = (crc >> 4) & 0xFFF; crc ^= tmp ^ table[byte & 0xF];
-    tmp = table[crc & 0xF]; crc = (crc >> 4) & 0xFFF; crc ^= tmp ^ table[(byte >> 4) & 0xF];
+// ═══════════════════════════════════════════════
+// FIT WRITER — spec Garmin FIT Protocol v2
+// ═══════════════════════════════════════════════
+function writeFIT(pts){
+  function crcByte(crc,byte){
+    const T=[0x0000,0xCC01,0xD801,0x1400,0xF001,0x3C00,0x2800,0xE401,
+             0xA001,0x6C00,0x7800,0xB401,0x5000,0x9C01,0x8801,0x4400];
+    let t=T[crc&0xF];crc=(crc>>4)&0xFFF;crc^=t^T[byte&0xF];
+    t=T[crc&0xF];crc=(crc>>4)&0xFFF;crc^=t^T[(byte>>4)&0xF];
     return crc;
   }
+  function calcCRC(arr){let c=0;for(const b of arr)c=crcByte(c,b);return c;}
 
-  function crc(buf) { let c=0; for(const b of buf) c=crcUpdate(c,b); return c; }
+  // Build into a plain byte array for simplicity
+  const out=[];
+  function pu8(v){out.push(v&0xFF);}
+  function pu16(v){out.push(v&0xFF,(v>>8)&0xFF);}
+  function pu32(v){v=v>>>0;out.push(v&0xFF,(v>>8)&0xFF,(v>>16)&0xFF,(v>>24)&0xFF);}
+  function ps32(v){const b=new Int32Array([v]);const u=new Uint32Array(b.buffer);pu32(u[0]);}
 
-  const chunks = [];
-  const push = (arr) => chunks.push(new Uint8Array(arr));
+  function defMsg(lNum,gNum,fields){
+    pu8(0x40|(lNum&0xF));pu8(0);pu8(0);pu16(gNum);pu8(fields.length);
+    for(const[fd,sz,bt]of fields){pu8(fd);pu8(sz);pu8(bt);}
+  }
+  function datHdr(lNum){pu8(lNum&0xF);}
 
-  // def file_id (local 0)
-  push([0x40,0x00,0x00,0x00,0x00,0x05,
-    0x03,0x04,0x8C, 0x04,0x04,0x86, 0x01,0x02,0x84,
-    0x02,0x02,0x84, 0x00,0x01,0x00]);
+  function toSemi(deg){return Math.round(deg*(2**31/180.0))|0;}
+  function toFitTs(d){return Math.round(d.getTime()/1000)-FIT_EPOCH;}
 
-  // data file_id
-  const ts0 = toFitTs(pts[0].time);
-  const b = new ArrayBuffer(1+4+4+2+2+1);
-  const dv = new DataView(b);
-  dv.setUint8(0,0x00); dv.setUint32(1,0,true); dv.setUint32(5,ts0,true);
-  dv.setUint16(9,1,true); dv.setUint16(11,0,true); dv.setUint8(13,4);
-  chunks.push(new Uint8Array(b));
+  const ts0=toFitTs(pts[0].time),tsEnd=toFitTs(pts[pts.length-1].time),elapsed=tsEnd-ts0;
 
-  // def event (local 1)
-  push([0x41,0x00,0x00,0x15,0x00,0x03,
-    0xFD,0x04,0x86, 0x00,0x01,0x00, 0x01,0x01,0x00]);
+  // === file_id (local 0, global 0) ===
+  defMsg(0,0,[[0,1,0],[1,2,132],[2,2,132],[3,4,140],[4,4,134]]);
+  datHdr(0);pu8(4);pu16(1);pu16(1328);pu32(0x00BC614E);pu32(ts0);
 
+  // === event (local 1, global 21) ===
+  defMsg(1,21,[[253,4,134],[0,1,0],[1,1,0],[3,4,134]]);
   // start event
-  const ev = new ArrayBuffer(1+4+1+1);
-  const evv = new DataView(ev);
-  evv.setUint8(0,0x01); evv.setUint32(1,ts0,true); evv.setUint8(5,0); evv.setUint8(6,0);
-  chunks.push(new Uint8Array(ev));
+  datHdr(1);pu32(ts0);pu8(0);pu8(0);pu32(0);
 
-  // def record (local 2)
-  push([0x42,0x00,0x00,0x14,0x00,0x05,
-    0xFD,0x04,0x86, 0x00,0x04,0x85, 0x01,0x04,0x85,
-    0x02,0x02,0x84, 0x06,0x02,0x84]);
+  // === record (local 2, global 20) ===
+  // timestamp,lat,lon,distance(scale100,cm),speed(scale1000,mm/s),altitude(scale5,off500)
+  defMsg(2,20,[[253,4,134],[0,4,133],[1,4,133],[5,4,134],[6,2,132],[2,2,132]]);
 
-  // records
-  let prev = null;
-  for (const pt of pts) {
-    const ts = toFitTs(pt.time);
-    const lat = toSemi(pt.lat);
-    const lon = toSemi(pt.lon);
-    const alt = Math.max(0, Math.round((pt.ele + 500) * 5));
-    let spd = 0;
-    if (prev) {
-      const dt = (pt.time - prev.time) / 1000;
-      if (dt > 0) {
-        const d = haversine(prev.lat, prev.lon, pt.lat, pt.lon);
-        spd = Math.min(65535, Math.round((d/dt)*1000));
-      }
+  let totalDist=0,prev=null;
+  for(const pt of pts){
+    const ts=toFitTs(pt.time);
+    const lat=toSemi(pt.lat),lon=toSemi(pt.lon);
+    const alt=Math.max(0,Math.min(65535,Math.round((pt.ele+500)*5)));
+    let spd=0;
+    if(prev){
+      const dt=(pt.time-prev.time)/1000;
+      if(dt>0){const d=haversine(prev.lat,prev.lon,pt.lat,pt.lon);totalDist+=d;spd=Math.min(65535,Math.round((d/dt)*1000));}
     }
-    const rb = new ArrayBuffer(1+4+4+4+2+2);
-    const rd = new DataView(rb);
-    rd.setUint8(0,0x02);
-    rd.setUint32(1,ts,true);
-    rd.setInt32(5,lat,true);
-    rd.setInt32(9,lon,true);
-    rd.setUint16(13,alt,true);
-    rd.setUint16(15,spd,true);
-    chunks.push(new Uint8Array(rb));
-    prev = pt;
+    datHdr(2);pu32(ts);ps32(lat);ps32(lon);pu32(Math.round(totalDist*100));pu16(spd);pu16(alt);
+    prev=pt;
   }
 
-  const tsLast = toFitTs(pts[pts.length-1].time);
-  const elapsed = tsLast - ts0;
-
   // stop event
-  const ev2 = new ArrayBuffer(1+4+1+1);
-  const evv2 = new DataView(ev2);
-  evv2.setUint8(0,0x01); evv2.setUint32(1,tsLast,true); evv2.setUint8(5,0); evv2.setUint8(6,1);
-  chunks.push(new Uint8Array(ev2));
+  datHdr(1);pu32(tsEnd);pu8(0);pu8(4);pu32(0);
 
-  // def lap (local 3)
-  push([0x43,0x00,0x00,0x13,0x00,0x03,
-    0xFD,0x04,0x86, 0x19,0x04,0x86, 0x09,0x04,0x86]);
+  // === lap (local 3, global 19) ===
+  defMsg(3,19,[[253,4,134],[25,4,134],[21,4,134],[23,4,134],[254,2,132]]);
+  datHdr(3);pu32(tsEnd);pu32(ts0);pu32(elapsed*1000);pu32(Math.round(totalDist*100));pu16(0);
 
-  const lap = new ArrayBuffer(1+4+4+4);
-  const lapv = new DataView(lap);
-  lapv.setUint8(0,0x03); lapv.setUint32(1,tsLast,true);
-  lapv.setUint32(5,ts0,true); lapv.setUint32(9,elapsed*1000,true);
-  chunks.push(new Uint8Array(lap));
+  // === session (local 4, global 18) ===
+  defMsg(4,18,[[253,4,134],[25,4,134],[21,4,134],[23,4,134],[5,1,0],[6,1,0],[254,2,132]]);
+  datHdr(4);pu32(tsEnd);pu32(ts0);pu32(elapsed*1000);pu32(Math.round(totalDist*100));pu8(2);pu8(0);pu16(0);
 
-  // def session (local 4)
-  push([0x44,0x00,0x00,0x12,0x00,0x04,
-    0xFD,0x04,0x86, 0x18,0x04,0x86, 0x09,0x04,0x86, 0x0B,0x01,0x00]);
+  // === activity (local 5, global 34) ===
+  defMsg(5,34,[[253,4,134],[1,4,134],[5,1,0],[4,4,134]]);
+  datHdr(5);pu32(tsEnd);pu32(tsEnd);pu8(1);pu32(elapsed*1000);
 
-  const sess = new ArrayBuffer(1+4+4+4+1);
-  const sessv = new DataView(sess);
-  sessv.setUint8(0,0x04); sessv.setUint32(1,tsLast,true);
-  sessv.setUint32(5,ts0,true); sessv.setUint32(9,elapsed*1000,true); sessv.setUint8(13,2);
-  chunks.push(new Uint8Array(sess));
+  // Body CRC
+  const bodyCRC=calcCRC(out);
+  out.push(bodyCRC&0xFF,(bodyCRC>>8)&0xFF);
 
-  // def activity (local 5)
-  push([0x45,0x00,0x00,0x22,0x00,0x03,
-    0xFD,0x04,0x86, 0x01,0x04,0x86, 0x05,0x01,0x00]);
+  // Header (14 bytes) — data_size = body without trailing 2 CRC bytes
+  const dataSize=out.length-2;
+  const hdr=[14,0x10,2132&0xFF,(2132>>8)&0xFF,
+    dataSize&0xFF,(dataSize>>8)&0xFF,(dataSize>>16)&0xFF,(dataSize>>24)&0xFF,
+    0x2E,0x46,0x49,0x54]; // ".FIT"
+  const hdrCRC=calcCRC(hdr);
+  hdr.push(hdrCRC&0xFF,(hdrCRC>>8)&0xFF);
 
-  const act = new ArrayBuffer(1+4+4+1);
-  const actv = new DataView(act);
-  actv.setUint8(0,0x05); actv.setUint32(1,tsLast,true);
-  actv.setUint32(5,tsLast,true); actv.setUint8(9,1);
-  chunks.push(new Uint8Array(act));
-
-  // Assemble data
-  const totalLen = chunks.reduce((s,c)=>s+c.length,0);
-  const data = new Uint8Array(totalLen);
-  let off = 0;
-  for(const c of chunks){ data.set(c,off); off+=c.length; }
-
-  const dataCrc = crc(data);
-  const dataWithCrc = new Uint8Array(totalLen+2);
-  dataWithCrc.set(data);
-  dataWithCrc[totalLen] = dataCrc & 0xFF;
-  dataWithCrc[totalLen+1] = (dataCrc>>8) & 0xFF;
-
-  // Header
-  const hdrBuf = new ArrayBuffer(12);
-  const hdrv = new DataView(hdrBuf);
-  hdrv.setUint8(0,14); hdrv.setUint8(1,0x10);
-  hdrv.setUint16(2,2132,true);
-  hdrv.setUint32(4,totalLen+2,true);
-  hdrv.setUint8(8,0x2E); hdrv.setUint8(9,0x46); hdrv.setUint8(10,0x49); hdrv.setUint8(11,0x54);
-  const hdrArr = new Uint8Array(hdrBuf);
-  const hdrCrcVal = crc(hdrArr);
-
-  const full = new Uint8Array(14 + totalLen + 2);
-  full.set(hdrArr, 0);
-  full[12] = hdrCrcVal & 0xFF;
-  full[13] = (hdrCrcVal>>8) & 0xFF;
-  full.set(dataWithCrc, 14);
-
-  return full.buffer;
+  // Combine
+  const final=new Uint8Array(hdr.length+out.length);
+  final.set(hdr,0);final.set(out,hdr.length);
+  return final.buffer;
 }
 
-// ─── UI Logic ─────────────────────────────────────────────────
-let currentFile = null;
-let currentParsed = null;
-let outputFmt = 'gpx';
+// ═══════════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════════
+let loadedFiles=[],outputFmt='fit';
 
-const dropzone  = document.getElementById('dropzone');
-const fileInput = document.getElementById('fileInput');
-const btnProcess= document.getElementById('btnProcess');
-const btnDl     = document.getElementById('btnDownload');
-const statsPanel= document.getElementById('statsPanel');
-const errorMsg  = document.getElementById('errorMsg');
-const fileNameEl= document.getElementById('fileName');
-const threshold = document.getElementById('threshold');
-const threshVal = document.getElementById('thresholdVal');
-const progress  = document.getElementById('progressFill');
+const dropArea=document.getElementById('dropArea');
+const fileInput=document.getElementById('fileInput');
+const fileListEl=document.getElementById('fileList');
+const btnProcess=document.getElementById('btnProcess');
+const btnDownload=document.getElementById('btnDownload');
+const statsPanel=document.getElementById('statsPanel');
+const errorBox=document.getElementById('errorBox');
+const progressWrap=document.getElementById('progressWrap');
+const progressFill=document.getElementById('progressFill');
+const progressLabel=document.getElementById('progressLabel');
+const threshInput=document.getElementById('threshold');
+const threshValEl=document.getElementById('threshVal');
 
-document.querySelectorAll('.fmt-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.fmt-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    outputFmt = btn.dataset.fmt;
+threshInput.addEventListener('input',()=>{threshValEl.textContent=parseFloat(threshInput.value).toFixed(1);});
+
+document.querySelectorAll('.tog-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tog-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');outputFmt=btn.dataset.fmt;
   });
 });
 
-threshold.addEventListener('input', () => {
-  threshVal.textContent = parseFloat(threshold.value).toFixed(1);
-});
+dropArea.addEventListener('dragover',e=>{e.preventDefault();dropArea.classList.add('over');});
+dropArea.addEventListener('dragleave',()=>dropArea.classList.remove('over'));
+dropArea.addEventListener('drop',e=>{e.preventDefault();dropArea.classList.remove('over');handleFiles([...e.dataTransfer.files]);});
+fileInput.addEventListener('change',()=>{handleFiles([...fileInput.files]);fileInput.value='';});
 
-dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
-dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
-dropzone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropzone.classList.remove('drag-over');
-  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-});
+function showError(msg){errorBox.textContent=msg;errorBox.classList.add('visible');}
+function clearError(){errorBox.classList.remove('visible');}
 
-fileInput.addEventListener('change', () => {
-  if (fileInput.files[0]) handleFile(fileInput.files[0]);
-});
-
-function showError(msg) {
-  errorMsg.textContent = msg;
-  errorMsg.classList.add('visible');
-}
-function clearError() { errorMsg.classList.remove('visible'); }
-
-async function handleFile(file) {
+async function handleFiles(files){
   clearError();
-  btnDl.classList.remove('visible');
+  for(const file of files){
+    const ext=file.name.split('.').pop().toLowerCase();
+    if(!['gpx','fit'].includes(ext)){showError(`Formato non supportato: ${file.name}`);continue;}
+    if(loadedFiles.find(f=>f.name===file.name))continue;
+    try{
+      let parsed;
+      if(ext==='gpx'){const text=await file.text();parsed=parseGPX(text,file.name);}
+      else{const buf=await file.arrayBuffer();parsed=parseFIT(buf,file.name);}
+      if(!parsed.pts.length){showError(`Nessun trackpoint in ${file.name}`);continue;}
+      loadedFiles.push({name:file.name,parsed});
+      renderFileList();
+    }catch(e){showError(`Errore in ${file.name}: ${e.message}`);}
+  }
+  btnProcess.disabled=loadedFiles.length===0;
+  btnDownload.classList.remove('visible');
   statsPanel.classList.remove('visible');
-  currentFile = file;
-  currentParsed = null;
-
-  const ext = file.name.split('.').pop().toLowerCase();
-  if (!['gpx','fit'].includes(ext)) { showError('Formato non supportato. Usa .gpx o .fit'); return; }
-
-  fileNameEl.textContent = '📄 ' + file.name;
-  fileNameEl.classList.add('visible');
-
-  try {
-    if (ext === 'gpx') {
-      const text = await file.text();
-      currentParsed = parseGPX(text);
-    } else {
-      const buf = await file.arrayBuffer();
-      currentParsed = parseFIT(buf);
-    }
-
-    if (!currentParsed.pts.length) throw new Error('Nessun trackpoint trovato nel file');
-    btnProcess.disabled = false;
-  } catch(e) {
-    showError('Errore lettura file: ' + e.message);
-  }
 }
 
-btnProcess.addEventListener('click', async () => {
-  if (!currentParsed) return;
+function renderFileList(){
+  fileListEl.innerHTML='';
+  loadedFiles.forEach((f,idx)=>{
+    const pts=f.parsed.pts,tS=pts[0].time,tE=pts[pts.length-1].time;
+    const dur=Math.round((tE-tS)/60000);
+    const div=document.createElement('div');div.className='file-item';
+    div.innerHTML=`<span class="fi-name">${f.name}</span><span class="fi-info">${pts.length} pt · ${dur}min · ${fmtDate(tS)}</span><button class="fi-rm" data-idx="${idx}">✕</button>`;
+    fileListEl.appendChild(div);
+  });
+  fileListEl.querySelectorAll('.fi-rm').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      loadedFiles.splice(parseInt(btn.dataset.idx),1);
+      renderFileList();
+      btnProcess.disabled=loadedFiles.length===0;
+      btnDownload.classList.remove('visible');statsPanel.classList.remove('visible');
+    });
+  });
+}
+
+function setProgress(pct,label){progressFill.style.width=pct+'%';if(label)progressLabel.textContent=label;}
+
+btnProcess.addEventListener('click',async()=>{
   clearError();
-  btnDl.classList.remove('visible');
-  statsPanel.classList.add('visible');
-  progress.style.width = '10%';
-
-  await new Promise(r => setTimeout(r, 30));
-
-  const thresh = parseFloat(threshold.value);
-  const { kept, removed, movingTime, stoppedTime, totalDist } = removeStops(currentParsed.pts, thresh);
-
-  progress.style.width = '60%';
-  await new Promise(r => setTimeout(r, 30));
-
-  const totalTime = movingTime + stoppedTime;
-  const velOld = totalDist/1000 / (totalTime/3600);
-  const velNew = movingTime > 0 ? totalDist/1000 / (movingTime/3600) : 0;
-
-  document.getElementById('statDist').textContent = (totalDist/1000).toFixed(1);
-  document.getElementById('statVelOld').textContent = velOld.toFixed(1);
-  document.getElementById('statVelNew').textContent = velNew.toFixed(1);
-  document.getElementById('statTimeTotal').textContent = fmtTime(totalTime);
-  document.getElementById('statTimeStopped').textContent = fmtTime(stoppedTime);
-  document.getElementById('statRemoved').textContent = removed + ' pt';
-
-  document.getElementById('statsLog').innerHTML =
-    `<span>${currentParsed.pts.length}</span> punti originali → ` +
-    `<span>${kept.length}</span> punti mantenuti — ` +
-    `soglia: <span>${thresh} km/h</span>`;
-
-  progress.style.width = '80%';
-  await new Promise(r => setTimeout(r, 30));
-
-  // Generate output
-  let blob, filename;
-  if (outputFmt === 'gpx') {
-    const gpxStr = writeGPX(kept);
-    blob = new Blob([gpxStr], { type: 'application/gpx+xml' });
-    filename = currentFile.name.replace(/\.(gpx|fit)$/i, '_cleaned.gpx');
-  } else {
-    const fitBuf = writeFIT(kept);
-    blob = new Blob([fitBuf], { type: 'application/octet-stream' });
-    filename = currentFile.name.replace(/\.(gpx|fit)$/i, '_cleaned.fit');
+  btnDownload.classList.remove('visible');statsPanel.classList.remove('visible');
+  progressWrap.classList.add('visible');setProgress(5,'parsing tracce...');await tick();
+  try{
+    const thresh=parseFloat(threshInput.value);
+    const tracks=loadedFiles.map(f=>({...f.parsed,filename:f.name}));
+    setProgress(20,'merge cronologico...');await tick();
+    const{pts,removed,origCount,movingTime,stoppedTime,totalDist,mergeLog}=mergeAndClean(tracks,thresh);
+    setProgress(60,'generazione file...');await tick();
+    if(!pts.length)throw new Error('Nessun punto rimasto dopo la pulizia!');
+    const totT=movingTime+stoppedTime;
+    const vOld=totalDist/1000/(totT/3600);
+    const vNew=movingTime>0?totalDist/1000/(movingTime/3600):0;
+    document.getElementById('sDist').textContent=(totalDist/1000).toFixed(1);
+    document.getElementById('sVelOld').textContent=vOld.toFixed(1);
+    document.getElementById('sVelNew').textContent=vNew.toFixed(1);
+    document.getElementById('sTimeTotal').textContent=fmtTime(totT);
+    document.getElementById('sTimeStopped').textContent=fmtTime(stoppedTime);
+    document.getElementById('sRemoved').textContent=removed;
+    document.getElementById('statsLog').innerHTML=`<b>${origCount}</b> punti originali → <b>${pts.length}</b> mantenuti · soglia <b>${thresh} km/h</b>`;
+    document.getElementById('mergeInfo').innerHTML=tracks.length>1?mergeLog.map(l=>`<div>${l}</div>`).join(''):'';
+    setProgress(80,'scrittura output...');await tick();
+    const base=loadedFiles.length===1?loadedFiles[0].name.replace(/\.(gpx|fit)$/i,''):'merged';
+    let blob,filename;
+    if(outputFmt==='gpx'){blob=new Blob([writeGPX(pts)],{type:'application/gpx+xml'});filename=base+'_cleaned.gpx';}
+    else{blob=new Blob([writeFIT(pts)],{type:'application/octet-stream'});filename=base+'_cleaned.fit';}
+    btnDownload.href=URL.createObjectURL(blob);
+    btnDownload.download=filename;
+    setProgress(100,'fatto!');await tick();
+    statsPanel.classList.add('visible');
+    btnDownload.classList.add('visible');
+    btnDownload.textContent=`⬇ SCARICA ${filename.toUpperCase()}`;
+    setTimeout(()=>progressWrap.classList.remove('visible'),1000);
+  }catch(e){
+    showError(e.message);progressWrap.classList.remove('visible');
   }
-
-  const url = URL.createObjectURL(blob);
-  btnDl.href = url;
-  btnDl.download = filename;
-
-  progress.style.width = '100%';
-  await new Promise(r => setTimeout(r, 200));
-
-  btnDl.classList.add('visible');
-  btnDl.textContent = `⬇ SCARICA ${filename}`;
 });
 </script>
 </body>
