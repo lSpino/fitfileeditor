@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TRACE CLEANER — GPX & FIT Tool 4</title>
+<title>TRACE CLEANER — GPX & FIT Tool (Road Routing Version)</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <style>
 :root {
   --bg: #0a0a0a;
@@ -82,22 +83,50 @@ header{padding:3rem 0 2.5rem;border-bottom:1px solid var(--border);margin-bottom
 .btn-download{display:none;width:100%;padding:1.1rem;background:none;border:1px solid var(--accent);color:var(--accent);font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:.12em;cursor:pointer;transition:all .15s;text-align:center;text-decoration:none;}
 .btn-download.visible{display:block;}
 .btn-download:hover{background:var(--accent);color:#000;}
+
+.map-wrap{display:none;margin-bottom:1.5rem;border:1px solid var(--border);background:var(--bg);}
+.map-wrap.visible{display:block;animation:fadeIn .4s ease;}
+.map-header{display:flex;align-items:center;justify-content:space-between;padding:.8rem 1.2rem;background:var(--panel);border-bottom:1px solid var(--border);}
+.map-header span{font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);}
+.map-header b{color:var(--accent);}
+.map-toggle{background:none;border:1px solid var(--border);color:var(--muted);font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:.1em;padding:.3rem .7rem;cursor:pointer;transition:all .15s;text-transform:uppercase;}
+.map-toggle:hover{border-color:var(--accent);color:var(--accent);}
+.map-toggle.on{border-color:var(--accent);color:var(--accent);}
+.map-container{position:relative;width:100%;height:340px;background:#151515;overflow:hidden;}
+#leafletMap{position:absolute;inset:0;width:100%;height:100%;z-index:2;transition:opacity .25s ease;}
+#mapPlaceholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#151515;color:#333;font-size:.8rem;letter-spacing:.3em;z-index:1;}
+
 footer{margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border);font-size:.6rem;letter-spacing:.1em;color:var(--muted);line-height:2;}
 footer span{color:var(--accent2);}
+
+/* Forza lo sfondo nero dietro la mappa */
+#leafletMap {
+    background: #000 !important; 
+}
+
+/* Rendi invisibili i tasselli della mappa quando necessario */
+.hide-tiles .leaflet-tile-container {
+    display: none !important;
+}
+/* Nasconde anche i loghi in basso a destra per un look pulito */
+.hide-tiles .leaflet-control-attribution {
+    display: none !important;
+}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 </head>
 <body>
 <div class="wrap">
 <header>
-  <div class="logo">TRACE<br><em>CLEANER</em></div>
-  <p class="tagline">GPX &amp; FIT processor — <span>rimuovi soste · unisci tracce · esporta FIT/GPX</span></p>
+  <div class="logo">TRACE<em>CLEANER</em></div>
+  <p class="tagline">GPX &amp; FIT processor — <span>routing stradale · unisci tracce · esporta</span></p>
 </header>
 
 <div class="drop-area" id="dropArea">
   <input type="file" id="fileInput" accept=".gpx,.fit" multiple>
   <div class="drop-icon">📂</div>
   <div class="drop-title">Trascina i file qui</div>
-  <div class="drop-sub">GPX o FIT — anche più file insieme</div>
+  <div class="drop-sub">GPX o FIT — merge con routing stradale</div>
 </div>
 
 <div class="file-list" id="fileList"></div>
@@ -122,7 +151,7 @@ footer span{color:var(--accent2);}
 
 <div class="error-box" id="errorBox"></div>
 
-<button class="btn-process" id="btnProcess" disabled>▶ PROCESSA</button>
+<button class="btn-process" id="btnProcess" disabled>▶ PROCESSA E UNISCI</button>
 
 <div class="progress-wrap" id="progressWrap">
   <div class="progress-label" id="progressLabel">elaborazione...</div>
@@ -142,17 +171,28 @@ footer span{color:var(--accent2);}
   <div class="merge-info" id="mergeInfo"></div>
 </div>
 
+<div class="map-wrap" id="mapWrap">
+  <div class="map-header">
+    <span>Traccia Finale — <b id="mapInfo">—</b></span>
+    <button class="map-toggle on" id="mapToggle">◼ nascondi mappa</button>
+  </div>
+  <div class="map-container">
+    <div id="leafletMap"></div>
+    <div id="mapPlaceholder">MAPPA ATTIVA</div>
+  </div>
+</div>
+
 <a class="btn-download" id="btnDownload" download>⬇ SCARICA FILE</a>
 
 <footer>
-  <div>tutto gira nel browser — <span>nessun dato viene inviato a server</span></div>
-  <div>supporta .gpx e .fit — merge automatico cronologico — rimozione soste</div>
+  <div>routing tramite <b>OSRM API</b> — merge cronologico — rimozione soste</div>
+  <div><span>Privacy:</span> le coordinate dei gap vengono inviate a OSRM per calcolare il percorso.</div>
 </footer>
 </div>
 
 <script>
 // ═══════════════════════════════════════════════
-// UTILITIES
+// UTILITIES & CONSTANTS
 // ═══════════════════════════════════════════════
 const FIT_EPOCH = 631065600;
 
@@ -163,11 +203,10 @@ function haversine(lat1,lon1,lat2,lon2){
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 function fmtTime(sec){const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60);return`${h}h ${m}min`;}
-function fmtDate(d){return d.toISOString().replace('T',' ').substring(0,16);}
 function tick(){return new Promise(r=>setTimeout(r,20));}
 
 // ═══════════════════════════════════════════════
-// GPX PARSER
+// PARSERS (GPX & FIT)
 // ═══════════════════════════════════════════════
 function parseGPX(text,filename){
   const doc=new DOMParser().parseFromString(text,'text/xml');
@@ -182,28 +221,18 @@ function parseGPX(text,filename){
     if(isNaN(t))continue;
     pts.push({lat:parseFloat(pt.getAttribute('lat')),lon:parseFloat(pt.getAttribute('lon')),ele:ee?parseFloat(ee.textContent):0,time:t});
   }
-  return{pts,filename,format:'gpx'};
+  return{pts,filename};
 }
 
-// ═══════════════════════════════════════════════
-// FIT PARSER
-// ═══════════════════════════════════════════════
 function parseFIT(buffer,filename){
   const bytes=new Uint8Array(buffer),view=new DataView(buffer),pts=[],INV32=0x7FFFFFFF;
-  if(bytes[8]!==0x2E||bytes[9]!==0x46||bytes[10]!==0x49||bytes[11]!==0x54)throw new Error('FIT: magic .FIT non trovato');
-  const defs={};
-  let i=14;
-  const end=bytes.length-2;
+  const defs={}; let i=14; const end=bytes.length-2;
   while(i<end){
-    if(i>=bytes.length)break;
-    const hdr=bytes[i];
-    const isComp=(hdr&0x80)!==0;
+    const hdr=bytes[i]; const isComp=(hdr&0x80)!==0;
     if(isComp){
-      const lNum=(hdr>>5)&0x03;i++;
-      const def=defs[lNum];if(!def)continue;
+      const lNum=(hdr>>5)&0x03; i++; const def=defs[lNum]; if(!def)continue;
       let off=i,lat=null,lon=null,ele=null,ts=null;
       for(const f of def.fields){
-        if(off+f.size>bytes.length)break;
         if(def.gn===20){
           if(f.num===253&&f.size===4)ts=view.getUint32(off,def.le);
           if(f.num===0&&f.size===4)lat=view.getInt32(off,def.le);
@@ -212,25 +241,21 @@ function parseFIT(buffer,filename){
         }
         off+=f.size;
       }
-      if(def.gn===20&&ts!==null&&lat!==null&&lon!==null&&lat!==INV32&&lat!==(-INV32-1)&&lon!==INV32)
+      if(def.gn===20&&ts!==null&&lat!==null&&lon!==null&&lat!==INV32)
         pts.push({lat:lat*(180/2**31),lon:lon*(180/2**31),ele:ele!==null?ele/5-500:0,time:new Date(ts*1000+FIT_EPOCH*1000)});
-      i=off;continue;
+      i=off; continue;
     }
-    const isDef=(hdr&0x40)!==0,hasDevDef=(hdr&0x20)!==0,lNum=hdr&0x0F;
-    i++;
+    const isDef=(hdr&0x40)!==0,lNum=hdr&0x0F; i++;
     if(isDef){
-      i++;
-      const le=bytes[i++]===0;
-      const gn=le?(bytes[i]|bytes[i+1]<<8):(bytes[i]<<8|bytes[i+1]);i+=2;
-      const nf=bytes[i++];const fields=[];
-      for(let f=0;f<nf;f++){fields.push({num:bytes[i],size:bytes[i+1],type:bytes[i+2]});i+=3;}
-      if(hasDevDef){const nd=bytes[i++];for(let d=0;d<nd;d++)i+=3;}
+      i++; const le=bytes[i++]===0;
+      const gn=le?(bytes[i]|bytes[i+1]<<8):(bytes[i]<<8|bytes[i+1]); i+=2;
+      const nf=bytes[i++]; const fields=[];
+      for(let f=0;f<nf;f++){fields.push({num:bytes[i],size:bytes[i+1]}); i+=3;}
       defs[lNum]={gn,le,fields};
     }else{
-      const def=defs[lNum];if(!def){i++;continue;}
+      const def=defs[lNum]; if(!def){i++;continue;}
       let off=i,ts=null,lat=null,lon=null,ele=null;
       for(const f of def.fields){
-        if(off+f.size>bytes.length)break;
         if(def.gn===20){
           if(f.num===253&&f.size===4)ts=view.getUint32(off,def.le);
           if(f.num===0&&f.size===4)lat=view.getInt32(off,def.le);
@@ -239,128 +264,129 @@ function parseFIT(buffer,filename){
         }
         off+=f.size;
       }
-      if(def.gn===20&&ts!==null&&lat!==null&&lon!==null&&lat!==INV32&&lat!==(-INV32-1)&&lon!==INV32)
+      if(def.gn===20&&ts!==null&&lat!==null&&lon!==null)
         pts.push({lat:lat*(180/2**31),lon:lon*(180/2**31),ele:ele!==null?ele/5-500:0,time:new Date(ts*1000+FIT_EPOCH*1000)});
       i=off;
     }
   }
-  return{pts,filename,format:'fit'};
+  return{pts,filename};
 }
 
 // ═══════════════════════════════════════════════
-// MERGE + STOP REMOVAL
+// ROUTING API (OSRM)
 // ═══════════════════════════════════════════════
-function mergeAndClean(tracks, threshKmh) {
-  if (tracks.length === 0) return;
+async function fetchRoadRoute(p1, p2) {
+  // Utilizziamo il profilo "cycling" o "driving". "driving" è più stabile per OSRM pubblico.
+  const url = `https://router.project-osrm.org/route/v1/driving/${p1.lon},${p1.lat};${p2.lon},${p2.lat}?overview=full&geometries=geojson`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.code !== 'Ok' || !data.routes.length) return [];
+    
+    const coords = data.routes[0].geometry.coordinates;
+    const timeGap = p2.time - p1.time;
+    const stepTime = timeGap / coords.length;
 
-  // 1. Ordinamento e unione (logica esistente)
+    return coords.map((c, i) => ({
+      lat: c[1],
+      lon: c[0],
+      ele: p1.ele, // OSRM non fornisce ele, manteniamo quella di partenza
+      time: new Date(p1.time.getTime() + (stepTime * i))
+    }));
+  } catch (e) {
+    console.warn("Routing fallito:", e);
+    return [];
+  }
+}
+
+// ═══════════════════════════════════════════════
+// CORE LOGIC: MERGE, ROUTE & CLEAN
+// ═══════════════════════════════════════════════
+async function processTracks(tracks, threshKmh) {
   let remaining = [...tracks];
   remaining.sort((a, b) => a.pts[0].time - b.pts[0].time);
-  let orderedTracks = [remaining.shift()];
-  const log = [];
   
+  let orderedTracks = [remaining.shift()];
+  const mergeLog = [];
+
   while (remaining.length > 0) {
-    let lastPt = orderedTracks[orderedTracks.length - 1].pts.slice(-1)[0];
+    let lastTrack = orderedTracks[orderedTracks.length - 1];
+    let lastPt = lastTrack.pts[lastTrack.pts.length - 1];
     let bestIdx = -1; let minD = Infinity;
     for (let i = 0; i < remaining.length; i++) {
       let d = haversine(lastPt.lat, lastPt.lon, remaining[i].pts[0].lat, remaining[i].pts[0].lon);
       if (d < minD) { minD = d; bestIdx = i; }
     }
-    let nextTrack = remaining.splice(bestIdx, 1)[0];
-    log.push(`🔗 Unito ${nextTrack.filename} (Gap: ${Math.round(minD)}m)`);
-    orderedTracks.push(nextTrack);
+    orderedTracks.push(remaining.splice(bestIdx, 1)[0]);
   }
 
-  // 2. Creazione traccia grezza unita
-  let combinedPts = [];
-  for (let t of orderedTracks) {
-    combinedPts.push(...t.pts);
+  let rawCombined = [];
+  for (let i = 0; i < orderedTracks.length; i++) {
+    const currentPts = orderedTracks[i].pts;
+    if (i > 0) {
+      const pPrev = rawCombined[rawCombined.length - 1];
+      const pNext = currentPts[0];
+      const gap = haversine(pPrev.lat, pPrev.lon, pNext.lat, pNext.lon);
+      
+      if (gap > 50) { // Se il buco è più di 50m, cerca la strada
+        mergeLog.push(`🛣️ Gap di ${Math.round(gap)}m tra ${orderedTracks[i-1].filename} e ${orderedTracks[i].filename}: calcolo strada...`);
+        const road = await fetchRoadRoute(pPrev, pNext);
+        if (road.length) rawCombined.push(...road);
+      } else {
+        mergeLog.push(`🔗 Unione diretta tra ${orderedTracks[i-1].filename} e ${orderedTracks[i].filename}`);
+      }
+    }
+    rawCombined.push(...currentPts);
   }
 
-  // 3. FILTRO SOSTE (Il cuore della modifica)
+  // Rimozione soste e ricalcolo tempi
   let finalPts = [];
-  let totalDist = 0;
-  let movingTimeSec = 0;
-  let stoppedTimeSec = 0;
-  let lastValidPt = null;
+  let totalDist = 0, movingTime = 0, stoppedTime = 0;
+  let lastValid = null;
 
-  for (let i = 0; i < combinedPts.length; i++) {
-    const curr = combinedPts[i];
-    if (i === 0) {
-      finalPts.push(curr);
-      lastValidPt = curr;
-      continue;
-    }
-
-    const prev = combinedPts[i-1];
+  for (let i = 0; i < rawCombined.length; i++) {
+    const curr = rawCombined[i];
+    if (i === 0) { finalPts.push(curr); lastValid = curr; continue; }
+    
+    const prev = rawCombined[i-1];
     const d = haversine(prev.lat, prev.lon, curr.lat, curr.lon);
-    const dt = (curr.time - prev.time) / 1000; // secondi
-    const speedKmh = dt > 0 ? (d / dt) * 3.6 : 0;
+    const dt = (curr.time - prev.time) / 1000;
+    const speed = dt > 0 ? (d / dt) * 3.6 : 0;
 
-    if (speedKmh >= threshKmh) {
-      // MOVIMENTO
-      totalDist += d;
-      movingTimeSec += dt;
-      
-      // Se vogliamo che Strava veda una traccia "senza buchi", 
-      // ricalcoliamo il timestamp per chiudere il gap della sosta
-      const newTime = new Date(lastValidPt.time.getTime() + (dt * 1000));
-      const ptToPush = { ...curr, time: newTime };
-      
-      finalPts.push(ptToPush);
-      lastValidPt = ptToPush;
+    if (speed >= threshKmh) {
+      totalDist += d; movingTime += dt;
+      const newTime = new Date(lastValid.time.getTime() + (dt * 1000));
+      const pt = { ...curr, time: newTime };
+      finalPts.push(pt); lastValid = pt;
     } else {
-      // SOSTA
-      stoppedTimeSec += dt;
+      stoppedTime += dt;
     }
   }
 
-  return {
-    pts: finalPts,
-    removed: combinedPts.length - finalPts.length,
-    origCount: combinedPts.length,
-    movingTime: movingTimeSec,
-    stoppedTime: stoppedTimeSec,
-    totalDist: totalDist,
-    mergeLog: log
-  };
+  return { pts: finalPts, totalDist, movingTime, stoppedTime, log: mergeLog, originalCount: rawCombined.length };
 }
+
 // ═══════════════════════════════════════════════
-// GPX WRITER
+// WRITERS (GPX & FIT)
 // ═══════════════════════════════════════════════
 function writeGPX(pts){
   const ns='http://www.topografix.com/GPX/1/1';
   const doc=document.implementation.createDocument(ns,'gpx',null);
   const gpx=doc.documentElement;
-  gpx.setAttribute('version','1.1');gpx.setAttribute('creator','TraceCleaner');
+  gpx.setAttribute('version','1.1'); gpx.setAttribute('creator','TraceCleaner');
   const trk=doc.createElementNS(ns,'trk');
-  const nm=doc.createElementNS(ns,'name');nm.textContent='Activity (cleaned)';trk.appendChild(nm);
-  const ty=doc.createElementNS(ns,'type');ty.textContent='cycling';trk.appendChild(ty);
   const seg=doc.createElementNS(ns,'trkseg');
   for(const pt of pts){
     const tp=doc.createElementNS(ns,'trkpt');
-    tp.setAttribute('lat',pt.lat.toFixed(10));tp.setAttribute('lon',pt.lon.toFixed(10));
-    const el=doc.createElementNS(ns,'ele');el.textContent=pt.ele.toFixed(2);tp.appendChild(el);
-    const ti=doc.createElementNS(ns,'time');ti.textContent=pt.time.toISOString();tp.appendChild(ti);
+    tp.setAttribute('lat',pt.lat.toFixed(7)); tp.setAttribute('lon',pt.lon.toFixed(7));
+    const el=doc.createElementNS(ns,'ele'); el.textContent=pt.ele.toFixed(1); tp.appendChild(el);
+    const ti=doc.createElementNS(ns,'time'); ti.textContent=pt.time.toISOString(); tp.appendChild(ti);
     seg.appendChild(tp);
   }
-  trk.appendChild(seg);gpx.appendChild(trk);
-  return'<?xml version="1.0" encoding="UTF-8"?>\n'+new XMLSerializer().serializeToString(doc);
+  trk.appendChild(seg); gpx.appendChild(trk);
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+new XMLSerializer().serializeToString(doc);
 }
 
-// ═══════════════════════════════════════════════
-// FIT WRITER — spec Garmin FIT Protocol v2
-// Timestamps sono riscritti in modo CONTINUO:
-// i buchi (soste rimosse) vengono compressi via
-// timer stop/start events così Strava capisce
-// che il tempo non deve essere contato.
-// ═══════════════════════════════════════════════
-// ════════════════════════════════════════════════════════════════
-// FIT WRITER — Con gestione PAUSE (Eventi Timer reali)
-// ════════════════════════════════════════════════════════════════
-// ════════════════════════════════════════════════════════════════
-// FIT WRITER — Con gestione PAUSE (Eventi Timer reali)
-// ════════════════════════════════════════════════════════════════
 function writeFIT(pts) {
   const FIT_EPOCH = 631065600;
   const THRESHOLD_KMH = parseFloat(document.getElementById('threshold').value);
@@ -496,118 +522,120 @@ function writeFIT(pts) {
 }
 
 // ═══════════════════════════════════════════════
-// UI
+// UI & EVENT HANDLERS
 // ═══════════════════════════════════════════════
-let loadedFiles=[],outputFmt='fit';
+let loadedFiles = [], outputFmt = 'fit', leafletMap = null;
 
-const dropArea=document.getElementById('dropArea');
-const fileInput=document.getElementById('fileInput');
-const fileListEl=document.getElementById('fileList');
-const btnProcess=document.getElementById('btnProcess');
-const btnDownload=document.getElementById('btnDownload');
-const statsPanel=document.getElementById('statsPanel');
-const errorBox=document.getElementById('errorBox');
-const progressWrap=document.getElementById('progressWrap');
-const progressFill=document.getElementById('progressFill');
-const progressLabel=document.getElementById('progressLabel');
-const threshInput=document.getElementById('threshold');
-const threshValEl=document.getElementById('threshVal');
+const fileInput = document.getElementById('fileInput');
+const btnProcess = document.getElementById('btnProcess');
+const btnDownload = document.getElementById('btnDownload');
+const threshInput = document.getElementById('threshold');
 
-threshInput.addEventListener('input',()=>{threshValEl.textContent=parseFloat(threshInput.value).toFixed(1);});
-
-document.querySelectorAll('.tog-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    document.querySelectorAll('.tog-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');outputFmt=btn.dataset.fmt;
-  });
+fileInput.addEventListener('change', async () => {
+    for (const file of fileInput.files) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        let parsed;
+        if (ext === 'gpx') parsed = parseGPX(await file.text(), file.name);
+        else if (ext === 'fit') parsed = parseFIT(await file.arrayBuffer(), file.name);
+        if (parsed && parsed.pts.length) loadedFiles.push(parsed);
+    }
+    renderList();
+    btnProcess.disabled = loadedFiles.length === 0;
 });
 
-dropArea.addEventListener('dragover',e=>{e.preventDefault();dropArea.classList.add('over');});
-dropArea.addEventListener('dragleave',()=>dropArea.classList.remove('over'));
-dropArea.addEventListener('drop',e=>{e.preventDefault();dropArea.classList.remove('over');handleFiles([...e.dataTransfer.files]);});
-fileInput.addEventListener('change',()=>{handleFiles([...fileInput.files]);fileInput.value='';});
-
-function showError(msg){errorBox.textContent=msg;errorBox.classList.add('visible');}
-function clearError(){errorBox.classList.remove('visible');}
-
-async function handleFiles(files){
-  clearError();
-  for(const file of files){
-    const ext=file.name.split('.').pop().toLowerCase();
-    if(!['gpx','fit'].includes(ext)){showError(`Formato non supportato: ${file.name}`);continue;}
-    if(loadedFiles.find(f=>f.name===file.name))continue;
-    try{
-      let parsed;
-      if(ext==='gpx'){const text=await file.text();parsed=parseGPX(text,file.name);}
-      else{const buf=await file.arrayBuffer();parsed=parseFIT(buf,file.name);}
-      if(!parsed.pts.length){showError(`Nessun trackpoint in ${file.name}`);continue;}
-      loadedFiles.push({name:file.name,parsed});
-      renderFileList();
-    }catch(e){showError(`Errore in ${file.name}: ${e.message}`);}
-  }
-  btnProcess.disabled=loadedFiles.length===0;
-  btnDownload.classList.remove('visible');
-  statsPanel.classList.remove('visible');
+function renderList() {
+    const list = document.getElementById('fileList');
+    list.innerHTML = loadedFiles.map((f, i) => `<div class="file-item"><span class="fi-name">${f.filename}</span><button onclick="loadedFiles.splice(${i},1);renderList();">✕</button></div>`).join('');
 }
 
-function renderFileList(){
-  fileListEl.innerHTML='';
-  loadedFiles.forEach((f,idx)=>{
-    const pts=f.parsed.pts,tS=pts[0].time,tE=pts[pts.length-1].time;
-    const dur=Math.round((tE-tS)/60000);
-    const div=document.createElement('div');div.className='file-item';
-    div.innerHTML=`<span class="fi-name">${f.name}</span><span class="fi-info">${pts.length} pt · ${dur}min · ${fmtDate(tS)}</span><button class="fi-rm" data-idx="${idx}">✕</button>`;
-    fileListEl.appendChild(div);
-  });
-  fileListEl.querySelectorAll('.fi-rm').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      loadedFiles.splice(parseInt(btn.dataset.idx),1);
-      renderFileList();
-      btnProcess.disabled=loadedFiles.length===0;
-      btnDownload.classList.remove('visible');statsPanel.classList.remove('visible');
-    });
-  });
-}
+btnProcess.addEventListener('click', async () => {
+    const progWrap = document.getElementById('progressWrap');
+    const progFill = document.getElementById('progressFill');
+    progWrap.classList.add('visible');
+    progFill.style.width = '30%';
+    
+    try {
+        const result = await processTracks(loadedFiles, parseFloat(threshInput.value));
+        
+        // --- CALCOLO STATISTICHE ---
+        const totalTimeSec = result.movingTime + result.stoppedTime;
+        const avgVelTotal = totalTimeSec > 0 ? (result.totalDist / totalTimeSec) * 3.6 : 0;
+        const avgVelMoving = result.movingTime > 0 ? (result.totalDist / result.movingTime) * 3.6 : 0;
 
-function setProgress(pct,label){progressFill.style.width=pct+'%';if(label)progressLabel.textContent=label;}
+        // --- AGGIORNAMENTO UI ---
+        // Distanza totale
+        document.getElementById('sDist').textContent = (result.totalDist / 1000).toFixed(1) + ' km';
+        
+        // Velocità media con soste (lorda)
+        document.getElementById('sVelOld').textContent = avgVelTotal.toFixed(1) + ' km/h';
+        
+        // Velocità media in movimento (netta)
+        document.getElementById('sVelNew').textContent = avgVelMoving.toFixed(1) + ' km/h';
+        
+        // Durata totale (tempo trascorso)
+        document.getElementById('sTimeTotal').textContent = fmtTime(totalTimeSec);
+        
+        // Tempo in sosta rimosso
+        document.getElementById('sTimeStopped').textContent = fmtTime(result.stoppedTime);
+        
+        // Numero di punti nella traccia finale
+        document.getElementById('sRemoved').textContent = result.pts.length;
 
-btnProcess.addEventListener('click',async()=>{
-  clearError();
-  btnDownload.classList.remove('visible');statsPanel.classList.remove('visible');
-  progressWrap.classList.add('visible');setProgress(5,'parsing tracce...');await tick();
-  try{
-    const thresh=parseFloat(threshInput.value);
-    const tracks=loadedFiles.map(f=>({...f.parsed,filename:f.name}));
-    setProgress(20,'merge cronologico...');await tick();
-    const{pts,removed,origCount,movingTime,stoppedTime,totalDist,mergeLog}=mergeAndClean(tracks,thresh);
-    setProgress(60,'generazione file...');await tick();
-    if(!pts.length)throw new Error('Nessun punto rimasto dopo la pulizia!');
-    const totT=movingTime+stoppedTime;
-    const vOld=totalDist/1000/(totT/3600);
-    const vNew=movingTime>0?totalDist/1000/(movingTime/3600):0;
-    document.getElementById('sDist').textContent=(totalDist/1000).toFixed(1);
-    document.getElementById('sVelOld').textContent=vOld.toFixed(1);
-    document.getElementById('sVelNew').textContent=vNew.toFixed(1);
-    document.getElementById('sTimeTotal').textContent=fmtTime(totT);
-    document.getElementById('sTimeStopped').textContent=fmtTime(stoppedTime);
-    document.getElementById('sRemoved').textContent=removed;
-    document.getElementById('statsLog').innerHTML=`<b>${origCount}</b> punti originali → <b>${pts.length}</b> mantenuti · soglia <b>${thresh} km/h</b>`;
-    document.getElementById('mergeInfo').innerHTML=tracks.length>1?mergeLog.map(l=>`<div>${l}</div>`).join(''):'';
-    setProgress(80,'scrittura output...');await tick();
-    const base=loadedFiles.length===1?loadedFiles[0].name.replace(/\.(gpx|fit)$/i,''):'merged';
-    let blob,filename;
-    if(outputFmt==='gpx'){blob=new Blob([writeGPX(pts)],{type:'application/gpx+xml'});filename=base+'_cleaned.gpx';}
-    else{blob=new Blob([writeFIT(pts,thresh)],{type:'application/octet-stream'});filename=base+'_cleaned.fit';}
-    btnDownload.href=URL.createObjectURL(blob);
-    btnDownload.download=filename;
-    setProgress(100,'fatto!');await tick();
-    statsPanel.classList.add('visible');
-    btnDownload.classList.add('visible');
-    btnDownload.textContent=`⬇ SCARICA ${filename.toUpperCase()}`;
-    setTimeout(()=>progressWrap.classList.remove('visible'),1000);
-  }catch(e){
-    showError(e.message);progressWrap.classList.remove('visible');
-  }
+        // Log dei merge e mappa
+        document.getElementById('statsLog').innerHTML = result.log.map(l => `<div>${l}</div>`).join('');
+        document.getElementById('statsPanel').classList.add('visible');
+        
+        // Visualizzazione Mappa
+        document.getElementById('mapWrap').classList.add('visible');
+        if(leafletMap) leafletMap.remove();
+        leafletMap = L.map('leafletMap').setView([result.pts[0].lat, result.pts[0].lon], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(leafletMap);
+        const poly = L.polyline(result.pts.map(p => [p.lat, p.lon]), {color: '#00ff88', weight: 3}).addTo(leafletMap);
+        leafletMap.fitBounds(poly.getBounds());
+
+        // --- PREPARAZIONE DOWNLOAD ---
+        const blob = outputFmt === 'gpx' ? 
+            new Blob([writeGPX(result.pts)], {type:'text/xml'}) : 
+            new Blob([writeFIT(result.pts)], {type:'application/octet-stream'});
+        
+        btnDownload.href = URL.createObjectURL(blob);
+        btnDownload.download = `cleaned_merged_${Date.now()}.${outputFmt}`;
+        btnDownload.classList.add('visible');
+        
+        progFill.style.width = '100%';
+        setTimeout(() => progWrap.classList.remove('visible'), 500);
+
+    } catch (e) {
+        console.error(e);
+        alert("Errore durante l'elaborazione: " + e.message);
+        progWrap.classList.remove('visible');
+    }
+});
+
+document.querySelectorAll('.tog-btn').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.tog-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); outputFmt = b.dataset.fmt;
+}));
+
+const mapToggle = document.getElementById('mapToggle');
+let isMapVisible = true;
+
+mapToggle.addEventListener('click', () => {
+    const mapEl = document.getElementById('leafletMap');
+    
+    if (isMapVisible) {
+        // AGGIUNGE la classe che nasconde i disegni delle strade
+        mapEl.classList.add('hide-tiles');
+        mapToggle.textContent = '◻ mostra mappa';
+        mapToggle.classList.remove('on');
+        isMapVisible = false;
+    } else {
+        // RIMUOVE la classe e tornano le strade
+        mapEl.classList.remove('hide-tiles');
+        mapToggle.textContent = '◼ nascondi mappa';
+        mapToggle.classList.add('on');
+        isMapVisible = true;
+    }
 });
 </script>
 </body>
